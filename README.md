@@ -24,6 +24,7 @@
 | `/verify3` | Spotify Student | 学生认证 | ✅ 完整 | Spotify 学生订阅优惠 |
 | `/verify4` | Bolt.new Teacher | 教师认证 | ✅ 完整 | Bolt.new 教育优惠（自动获取 code）|
 | `/verify5` | YouTube Premium Student | 学生认证 | ⚠️ 半成品 | YouTube Premium 学生优惠（见下方说明）|
+| `/verify6` | ChatGPT Military | 军人认证 | ✅ 完整 | ChatGPT 军人优惠 |
 
 > **⚠️ YouTube 认证特别说明**：
 > 
@@ -40,7 +41,7 @@
 > 3. 开始认证流程，搜索 `https://services.sheerid.com/rest/v2/verification/`
 > 4. 从请求载荷中获取 `programId`，从响应中获取 `verificationId`
 > 5. 手动组成链接：`https://services.sheerid.com/verify/{programId}/?verificationId={verificationId}`
-> 6. 使用 `/verify5` 命令提交该链接
+> 6. 使用 `/verify5` 或 `/verify6` 命令提交该链接
 
 ### ✨ 核心功能
 
@@ -156,6 +157,7 @@ docker run -d \
 /verify3 <链接>     # Spotify Student 认证
 /verify4 <链接>     # Bolt.new Teacher 认证
 /verify5 <链接>     # YouTube Premium Student 认证
+/verify6 <链接>     # ChatGPT Military 认证
 /getV4Code <id>     # 获取 Bolt.new 认证码
 /help               # 查看帮助信息
 ```
