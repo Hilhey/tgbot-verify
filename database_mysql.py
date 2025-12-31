@@ -2,8 +2,10 @@
 
 使用提供的MySQL服务器进行数据存储
 """
+import csv
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional, Dict, List
 import pymysql
 from pymysql.cursors import DictCursor
@@ -131,13 +133,121 @@ class MySQLDatabase:
                 """
             )
 
+            # Military profiles table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS military_profiles (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    first_name VARCHAR(255) NOT NULL,
+                    last_name VARCHAR(255) NOT NULL,
+                    branch VARCHAR(255) NOT NULL,
+                    birth_date VARCHAR(255) NOT NULL,
+                    death_date VARCHAR(255) NOT NULL,
+                    used_at DATETIME NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_profile (
+                        first_name,
+                        last_name,
+                        branch,
+                        birth_date,
+                        death_date
+                    ),
+                    INDEX idx_branch (branch),
+                    INDEX idx_used_at (used_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
             conn.commit()
             logger.info("MySQL 数据库表初始化完成")
+
+            self._seed_military_profiles(cursor)
+            conn.commit()
 
         except Exception as e:
             logger.error(f"初始化数据库失败: {e}")
             conn.rollback()
             raise
+        finally:
+            cursor.close()
+            conn.close()
+
+    def _seed_military_profiles(self, cursor) -> None:
+        """Seed military profile data when empty."""
+        cursor.execute("SELECT COUNT(*) AS count FROM military_profiles")
+        row = cursor.fetchone()
+        if row and row[0] > 0:
+            return
+
+        data_path = Path(__file__).resolve().parent / "military" / "data.csv"
+        if not data_path.exists():
+            logger.warning("未找到 military/data.csv，跳过军人数据导入")
+            return
+
+        with data_path.open("r", encoding="utf-8") as handle:
+            reader = csv.reader(handle)
+            rows = []
+            for row in reader:
+                if not row:
+                    continue
+                if row[0].strip().lower() == "first name":
+                    continue
+                if len(row) < 5:
+                    continue
+                first_name, last_name, branch, birth_date, death_date = [item.strip() for item in row[:5]]
+                rows.append((first_name, last_name, branch, birth_date, death_date))
+
+        if not rows:
+            logger.warning("军人数据为空，跳过导入")
+            return
+
+        cursor.executemany(
+            """
+            INSERT IGNORE INTO military_profiles (
+                first_name,
+                last_name,
+                branch,
+                birth_date,
+                death_date
+            ) VALUES (%s, %s, %s, %s, %s)
+            """,
+            rows,
+        )
+
+        logger.info("已导入 %s 条军人数据", len(rows))
+
+    def get_next_military_profile(self) -> Optional[Dict]:
+        """Fetch the next unused military profile in input order."""
+        conn = self.get_connection()
+        cursor = conn.cursor(DictCursor)
+
+        try:
+            conn.begin()
+            cursor.execute(
+                """
+                SELECT *
+                FROM military_profiles
+                WHERE used_at IS NULL
+                ORDER BY id ASC
+                LIMIT 1
+                FOR UPDATE
+                """
+            )
+            row = cursor.fetchone()
+            if not row:
+                conn.rollback()
+                return None
+
+            cursor.execute(
+                "UPDATE military_profiles SET used_at = NOW() WHERE id = %s",
+                (row["id"],),
+            )
+            conn.commit()
+            return dict(row)
+        except Exception as exc:
+            logger.error("获取军人数据失败: %s", exc)
+            conn.rollback()
+            return None
         finally:
             cursor.close()
             conn.close()
@@ -547,4 +657,3 @@ class MySQLDatabase:
 
 # 创建全局实例的别名，保持与SQLite版本的兼容性
 Database = MySQLDatabase
-

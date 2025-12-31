@@ -15,6 +15,7 @@ from k12.sheerid_verifier import SheerIDVerifier as K12Verifier
 from spotify.sheerid_verifier import SheerIDVerifier as SpotifyVerifier
 from youtube.sheerid_verifier import SheerIDVerifier as YouTubeVerifier
 from Boltnew.sheerid_verifier import SheerIDVerifier as BoltnewVerifier
+from military.sheerid_verifier import SheerIDVerifier as MilitaryVerifier
 from utils.messages import get_insufficient_balance_message, get_verify_usage_message
 
 # 尝试导入并发控制，如果失败则使用空实现
@@ -535,6 +536,100 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
             )
     except Exception as e:
         logger.error("YouTube 验证过程出错: %s", e)
+        db.add_balance(user_id, VERIFY_COST)
+        await processing_msg.edit_text(
+            f"❌ 处理过程中出现错误：{str(e)}\n\n"
+            f"已退回 {VERIFY_COST} 积分"
+        )
+
+
+async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
+    """处理 /verify6 命令 - Military Verification"""
+    user_id = update.effective_user.id
+
+    if db.is_user_blocked(user_id):
+        await update.message.reply_text("您已被拉黑，无法使用此功能。")
+        return
+
+    if not db.user_exists(user_id):
+        await update.message.reply_text("请先使用 /start 注册。")
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            get_verify_usage_message("/verify6", "Military Verification")
+        )
+        return
+
+    url = context.args[0]
+    user = db.get_user(user_id)
+    if user["balance"] < VERIFY_COST:
+        await update.message.reply_text(
+            get_insufficient_balance_message(user["balance"])
+        )
+        return
+
+    verification_id = MilitaryVerifier.parse_verification_id(url)
+    if not verification_id:
+        await update.message.reply_text("无效的 SheerID 链接，请检查后重试。")
+        return
+
+    if not db.deduct_balance(user_id, VERIFY_COST):
+        await update.message.reply_text("扣除积分失败，请稍后重试。")
+        return
+
+    profile = db.get_next_military_profile()
+    if not profile:
+        db.add_balance(user_id, VERIFY_COST)
+        await update.message.reply_text("暂无可用军人数据，请联系管理员补充。")
+        return
+
+    processing_msg = await update.message.reply_text(
+        f"🪖 开始处理 Military 认证...\n"
+        f"已扣除 {VERIFY_COST} 积分\n\n"
+        "📝 正在生成军人信息...\n"
+        "🎨 正在生成军人证件 PNG...\n"
+        "📤 正在提交文档..."
+    )
+
+    semaphore = get_verification_semaphore("military")
+
+    try:
+        async with semaphore:
+            verifier = MilitaryVerifier(verification_id)
+            result = await asyncio.to_thread(
+                verifier.verify,
+                first_name=profile["first_name"],
+                last_name=profile["last_name"],
+                birth_date=profile["birth_date"],
+                death_date=profile["death_date"],
+                branch_name=profile["branch"],
+            )
+
+        db.add_verification(
+            user_id,
+            "military",
+            url,
+            "success" if result["success"] else "failed",
+            str(result),
+        )
+
+        if result["success"]:
+            result_msg = "✅ Military 认证成功！\n\n"
+            if result.get("pending"):
+                result_msg += "✨ 文档已提交，等待 SheerID 审核\n"
+                result_msg += "⏱️ 预计审核时间：几分钟内\n\n"
+            if result.get("redirect_url"):
+                result_msg += f"🔗 跳转链接：\n{result['redirect_url']}"
+            await processing_msg.edit_text(result_msg)
+        else:
+            db.add_balance(user_id, VERIFY_COST)
+            await processing_msg.edit_text(
+                f"❌ 认证失败：{result.get('message', '未知错误')}\n\n"
+                f"已退回 {VERIFY_COST} 积分"
+            )
+    except Exception as e:
+        logger.error("Military 验证过程出错: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ 处理过程中出现错误：{str(e)}\n\n"
