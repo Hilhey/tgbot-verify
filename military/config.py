@@ -1,4 +1,4 @@
-"""SheerID 军人认证配置"""
+"""Konfigurasi verifikasi militer SheerID"""
 
 SHEERID_BASE_URL = "https://services.sheerid.com"
 

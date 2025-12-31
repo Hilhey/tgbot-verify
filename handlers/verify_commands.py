@@ -1,4 +1,4 @@
-"""验证命令处理器"""
+"""Pengendali perintah verifikasi"""
 import asyncio
 import logging
 import httpx
@@ -18,11 +18,11 @@ from Boltnew.sheerid_verifier import SheerIDVerifier as BoltnewVerifier
 from military.sheerid_verifier import SheerIDVerifier as MilitaryVerifier
 from utils.messages import get_insufficient_balance_message, get_verify_usage_message
 
-# 尝试导入并发控制，如果失败则使用空实现
+# Coba impor kontrol konkruensi, jika gagal gunakan implementasi sederhana
 try:
     from utils.concurrency import get_verification_semaphore
 except ImportError:
-    # 如果导入失败，创建一个简单的实现
+    # Jika impor gagal, gunakan implementasi sederhana
     def get_verification_semaphore(verification_type: str):
         return asyncio.Semaphore(3)
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /verify 命令 - Gemini One Pro"""
+    """Menangani perintah /verify - Gemini One Pro"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -97,7 +97,7 @@ async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db:
                 f"{VERIFY_COST} poin telah dikembalikan"
             )
     except Exception as e:
-        logger.error("验证过程出错: %s", e)
+        logger.error("Terjadi kesalahan saat verifikasi: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
@@ -106,7 +106,7 @@ async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db:
 
 
 async def verify2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /verify2 命令 - ChatGPT Teacher K12"""
+    """Menangani perintah /verify2 - ChatGPT Teacher K12"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -173,7 +173,7 @@ async def verify2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
                 f"{VERIFY_COST} poin telah dikembalikan"
             )
     except Exception as e:
-        logger.error("验证过程出错: %s", e)
+        logger.error("Terjadi kesalahan saat verifikasi: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
@@ -182,7 +182,7 @@ async def verify2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
 
 async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /verify3 命令 - Spotify Student"""
+    """Menangani perintah /verify3 - Spotify Student"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -207,7 +207,7 @@ async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         )
         return
 
-    # 解析 verificationId
+    # Parse verificationId
     verification_id = SpotifyVerifier.parse_verification_id(url)
     if not verification_id:
         await update.message.reply_text("Tautan SheerID tidak valid, silakan periksa dan coba lagi.")
@@ -225,7 +225,7 @@ async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         "📤 Sedang mengirim dokumen..."
     )
 
-    # 使用信号量控制并发
+    # Gunakan semaphore untuk kontrol konkruensi
     semaphore = get_verification_semaphore("spotify_student")
 
     try:
@@ -256,7 +256,7 @@ async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
                 f"{VERIFY_COST} poin telah dikembalikan"
             )
     except Exception as e:
-        logger.error("Spotify 验证过程出错: %s", e)
+        logger.error("Terjadi kesalahan saat verifikasi Spotify: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
@@ -265,7 +265,7 @@ async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
 
 async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /verify4 命令 - Bolt.new Teacher（自动获取code版）"""
+    """Menangani perintah /verify4 - Bolt.new Teacher (ambil kode otomatis)"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -290,7 +290,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         )
         return
 
-    # 解析 externalUserId 或 verificationId
+    # Parse externalUserId atau verificationId
     external_user_id = BoltnewVerifier.parse_external_user_id(url)
     verification_id = BoltnewVerifier.parse_verification_id(url)
 
@@ -308,17 +308,17 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         "📤 Sedang mengirim dokumen..."
     )
 
-    # 使用信号量控制并发
+    # Gunakan semaphore untuk kontrol konkruensi
     semaphore = get_verification_semaphore("bolt_teacher")
 
     try:
         async with semaphore:
-            # 第1步：提交文档
+            # Langkah 1: kirim dokumen
             verifier = BoltnewVerifier(url, verification_id=verification_id)
             result = await asyncio.to_thread(verifier.verify)
 
         if not result.get("success"):
-            # 提交失败，退款
+            # Gagal kirim, kembalikan poin
             db.add_balance(user_id, VERIFY_COST)
             await processing_msg.edit_text(
                 f"❌ Pengiriman dokumen gagal: {result.get('message', 'Kesalahan tidak diketahui')}\n\n"
@@ -335,7 +335,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
             )
             return
         
-        # 更新消息
+        # Perbarui pesan
         await processing_msg.edit_text(
             f"✅ Dokumen sudah dikirim!\n"
             f"📋 ID Verifikasi: `{vid}`\n\n"
@@ -343,11 +343,11 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
             f"(maksimal menunggu 20 detik)"
         )
         
-        # 第2步：自动获取认证码（最多20秒）
+        # Langkah 2: ambil kode verifikasi otomatis (maks 20 detik)
         code = await _auto_get_reward_code(vid, max_wait=20, interval=5)
         
         if code:
-            # 成功获取
+            # Berhasil mendapatkan kode
             result_msg = (
                 f"🎉 Verifikasi berhasil - verificattion succesfull!\n\n"
                 f"✅ Dokumen sudah dikirim\n"
@@ -360,7 +360,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
             
             await processing_msg.edit_text(result_msg)
             
-            # 保存成功记录
+            # Simpan catatan sukses
             db.add_verification(
                 user_id,
                 "bolt_teacher",
@@ -370,7 +370,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
                 vid
             )
         else:
-            # 20秒内未获取到，让用户稍后查询
+            # Tidak mendapatkan dalam 20 detik, minta pengguna cek nanti
             await processing_msg.edit_text(
                 f"✅ Dokumen berhasil dikirim!\n\n"
                 f"⏳ Kode verifikasi belum tersedia (peninjauan bisa 1-5 menit)\n\n"
@@ -380,7 +380,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
                 f"Catatan: poin sudah terpakai, pengecekan nanti tidak dikenakan biaya lagi"
             )
             
-            # 保存待处理记录
+            # Simpan catatan pending
             db.add_verification(
                 user_id,
                 "bolt_teacher",
@@ -391,7 +391,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
             )
             
     except Exception as e:
-        logger.error("Bolt.new 验证过程出错: %s", e)
+        logger.error("Terjadi kesalahan saat verifikasi Bolt.new: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
@@ -404,15 +404,15 @@ async def _auto_get_reward_code(
     max_wait: int = 20,
     interval: int = 5
 ) -> Optional[str]:
-    """自动获取认证码（轻量级轮询，不影响并发）
+    """Ambil kode verifikasi otomatis (polling ringan, tidak mengganggu konkruensi)
     
     Args:
-        verification_id: 验证ID
-        max_wait: 最大等待时间（秒）
-        interval: 轮询间隔（秒）
+        verification_id: ID verifikasi
+        max_wait: waktu tunggu maksimal (detik)
+        interval: interval polling (detik)
         
     Returns:
-        str: 认证码，如果获取失败返回None
+        str: kode verifikasi, jika gagal None
     """
     import time
     start_time = time.time()
@@ -423,13 +423,13 @@ async def _auto_get_reward_code(
             elapsed = int(time.time() - start_time)
             attempts += 1
             
-            # 检查是否超时
+            # Cek timeout
             if elapsed >= max_wait:
-                logger.info(f"自动获取code超时({elapsed}秒)，让用户手动查询")
+                logger.info(f"Pengambilan kode otomatis timeout ({elapsed} detik), minta pengguna cek manual")
                 return None
             
             try:
-                # 查询验证状态
+                # Cek status verifikasi
                 response = await client.get(
                     f"https://my.sheerid.com/rest/v2/verification/{verification_id}"
                 )
@@ -439,29 +439,29 @@ async def _auto_get_reward_code(
                     current_step = data.get("currentStep")
                     
                     if current_step == "success":
-                        # 获取认证码
+                        # Ambil kode verifikasi
                         code = data.get("rewardCode") or data.get("rewardData", {}).get("rewardCode")
                         if code:
-                            logger.info(f"✅ 自动获取code成功: {code} (耗时{elapsed}秒)")
+                            logger.info(f"✅ Berhasil mengambil kode otomatis: {code} (durasi {elapsed} detik)")
                             return code
                     elif current_step == "error":
-                        # 审核失败
-                        logger.warning(f"审核失败: {data.get('errorIds', [])}")
+                        # Peninjauan gagal
+                        logger.warning(f"Peninjauan gagal: {data.get('errorIds', [])}")
                         return None
-                    # else: pending，继续等待
+                    # else: pending, lanjut tunggu
                 
-                # 等待下次轮询
+                # Tunggu polling berikutnya
                 await asyncio.sleep(interval)
                 
             except Exception as e:
-                logger.warning(f"查询认证码出错: {e}")
+                logger.warning(f"Gagal mengecek kode verifikasi: {e}")
                 await asyncio.sleep(interval)
     
     return None
 
 
 async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /verify5 命令 - YouTube Student Premium"""
+    """Menangani perintah /verify5 - YouTube Student Premium"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -486,7 +486,7 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         )
         return
 
-    # 解析 verificationId
+    # Parse verificationId
     verification_id = YouTubeVerifier.parse_verification_id(url)
     if not verification_id:
         await update.message.reply_text("Tautan SheerID tidak valid, silakan periksa dan coba lagi.")
@@ -504,7 +504,7 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         "📤 Sedang mengirim dokumen..."
     )
 
-    # 使用信号量控制并发
+    # Gunakan semaphore untuk kontrol konkruensi
     semaphore = get_verification_semaphore("youtube_student")
 
     try:
@@ -535,7 +535,7 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
                 f"{VERIFY_COST} poin telah dikembalikan"
             )
     except Exception as e:
-        logger.error("YouTube 验证过程出错: %s", e)
+        logger.error("Terjadi kesalahan saat verifikasi YouTube: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
@@ -544,7 +544,7 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
 
 async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /verify6 命令 - ChatGPT Military"""
+    """Menangani perintah /verify6 - ChatGPT Military"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -623,7 +623,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
                 f"{VERIFY_COST} poin telah dikembalikan"
             )
     except Exception as e:
-        logger.error("ChatGPT Military 验证过程出错: %s", e)
+        logger.error("Terjadi kesalahan saat verifikasi ChatGPT Military: %s", e)
         db.add_balance(user_id, VERIFY_COST)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
@@ -632,7 +632,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
 
 async def getV4Code_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /getV4Code 命令 - 获取 Bolt.new Teacher 认证码"""
+    """Menangani perintah /getV4Code - ambil kode verifikasi Bolt.new Teacher"""
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -643,7 +643,7 @@ async def getV4Code_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text("Silakan gunakan /start terlebih dahulu untuk mendaftar.")
         return
 
-    # 检查是否提供了 verification_id
+    # Cek apakah verification_id diberikan
     if not context.args:
         await update.message.reply_text(
             "Cara penggunaan: /getV4Code <verification_id>\n\n"
@@ -659,7 +659,7 @@ async def getV4Code_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     )
 
     try:
-        # 查询 SheerID API 获取认证码
+        # Cek SheerID API untuk mengambil kode verifikasi
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"https://my.sheerid.com/rest/v2/verification/{verification_id}"
@@ -701,7 +701,7 @@ async def getV4Code_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 )
 
     except Exception as e:
-        logger.error("获取 Bolt.new 认证码失败: %s", e)
+        logger.error("Gagal mengambil kode verifikasi Bolt.new: %s", e)
         await processing_msg.edit_text(
             f"❌ Terjadi kesalahan saat pengecekan: {str(e)}\n\n"
             "Silakan coba lagi nanti atau hubungi admin."

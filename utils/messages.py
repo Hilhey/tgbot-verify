@@ -1,4 +1,4 @@
-"""消息模板"""
+"""Template pesan"""
 from config import CHANNEL_URL, VERIFY_COST, HELP_NOTION_URL
 
 

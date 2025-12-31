@@ -9,7 +9,7 @@
 > 
 > Based on [@auto_sheerid_bot](https://t.me/auto_sheerid_bot) GGBond's legacy code with improvements
 
-[中文文档](README.md) | English
+[Dokumentasi Bahasa Indonesia](README.md) | English
 
 ---
 

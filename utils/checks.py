@@ -1,4 +1,4 @@
-"""权限检查和验证工具"""
+"""Pemeriksaan izin dan validasi"""
 import logging
 from telegram import Update
 from telegram.error import TelegramError
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def is_group_chat(update: Update) -> bool:
-    """判断是否为群聊"""
+    """Cek apakah chat grup"""
     chat = update.effective_chat
     return chat and chat.type in ("group", "supergroup")
 
@@ -24,10 +24,10 @@ async def reject_group_command(update: Update) -> bool:
 
 
 async def check_channel_membership(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """检查用户是否加入了频道"""
+    """Cek apakah pengguna sudah bergabung ke channel"""
     try:
         member = await context.bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
         return member.status in ["member", "administrator", "creator"]
     except TelegramError as e:
-        logger.error("检查频道成员失败: %s", e)
+        logger.error("Gagal memeriksa anggota channel: %s", e)
         return False

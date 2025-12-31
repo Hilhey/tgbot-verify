@@ -1,1 +1,1 @@
-"""ChatGPT Teacher K12 SheerID 认证模块"""
+"""Modul verifikasi SheerID ChatGPT Teacher K12"""

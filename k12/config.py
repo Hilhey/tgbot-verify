@@ -1,14 +1,14 @@
-# SheerID 教师验证配置文件
+# Konfigurasi verifikasi guru SheerID
 
-# SheerID API 配置
+# Konfigurasi API SheerID
 PROGRAM_ID = '68d47554aa292d20b9bec8f7'
 SHEERID_BASE_URL = 'https://services.sheerid.com'
 MY_SHEERID_URL = 'https://my.sheerid.com'
 
-# 文件大小限制
+# Batas ukuran file
 MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB
 
-# 学校配置（高中）
+# Konfigurasi sekolah (SMA)
 SCHOOLS = {
     '3995910': {
         'id': 3995910,
@@ -62,7 +62,6 @@ SCHOOLS = {
     
 }
 
-# 默认学校
+# Sekolah default
 DEFAULT_SCHOOL_ID = '3995910'
-
 
