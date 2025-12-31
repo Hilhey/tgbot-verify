@@ -87,7 +87,7 @@ CHANNEL_URL=xxx
 
 # MySQL database config
 MYSQL_HOST=localhost
-MYSQL_PORT=3306
+MYSQL_PORT=3307
 MYSQL_USER=root
 MYSQL_PASSWORD=xxx
 MYSQL_DATABASE=tgbot_verify
@@ -210,7 +210,7 @@ python bot.py
 | `CHANNEL_URL` | ❌ | Link channel | https://t.me/pk_oa |
 | `ADMIN_USER_ID` | ✅ | Telegram ID admin | - |
 | `MYSQL_HOST` | ✅ | Host MySQL | localhost |
-| `MYSQL_PORT` | ❌ | Port MySQL | 3306 |
+| `MYSQL_PORT` | ❌ | Port MySQL | 3307 |
 | `MYSQL_USER` | ✅ | Username MySQL | - |
 | `MYSQL_PASSWORD` | ✅ | Password MySQL | - |
 | `MYSQL_DATABASE` | ✅ | Nama database | tgbot_verify |

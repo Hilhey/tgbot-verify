@@ -25,7 +25,7 @@ class MySQLDatabase:
         # Ambil konfigurasi dari environment (disarankan) atau gunakan default
         self.config = {
             'host': os.getenv('MYSQL_HOST', 'localhost'),
-            'port': int(os.getenv('MYSQL_PORT', 3306)),
+            'port': int(os.getenv('MYSQL_PORT', 3307)),
             'user': os.getenv('MYSQL_USER', 'tgbot_user'),
             'password': os.getenv('MYSQL_PASSWORD', 'your_password_here'),
             'database': os.getenv('MYSQL_DATABASE', 'tgbot_verify'),

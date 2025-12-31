@@ -97,7 +97,7 @@ ADMIN_USER_ID=your_admin_id
 
 # MySQL Database Configuration
 MYSQL_HOST=localhost
-MYSQL_PORT=3306
+MYSQL_PORT=3307
 MYSQL_USER=root
 MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=tgbot_verify
@@ -239,7 +239,7 @@ tgbot-verify/
 | `CHANNEL_URL` | ❌ | Channel link | https://t.me/pk_oa |
 | `ADMIN_USER_ID` | ✅ | Admin Telegram ID | - |
 | `MYSQL_HOST` | ✅ | MySQL host address | localhost |
-| `MYSQL_PORT` | ❌ | MySQL port | 3306 |
+| `MYSQL_PORT` | ❌ | MySQL port | 3307 |
 | `MYSQL_USER` | ✅ | MySQL username | - |
 | `MYSQL_PASSWORD` | ✅ | MySQL password | - |
 | `MYSQL_DATABASE` | ✅ | Database name | tgbot_verify |
