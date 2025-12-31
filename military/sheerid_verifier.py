@@ -1,13 +1,12 @@
 """Program utama verifikasi militer SheerID"""
 import logging
-import random
 import re
 from typing import Dict, Optional, Tuple
 
 import httpx
 
 from . import config
-from .name_generator import generate_birth_date, generate_discharge_date, generate_email, generate_name
+from .data_store import get_organization, pop_random_record
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -86,19 +85,16 @@ class SheerIDVerifier:
     ) -> Dict:
         """Jalankan alur verifikasi militer"""
         try:
-            if not first_name or not last_name:
-                name = generate_name()
-                first_name = name["first_name"]
-                last_name = name["last_name"]
-
-            if not birth_date:
-                birth_date = generate_birth_date()
+            record = pop_random_record()
+            first_name = record.first_name
+            last_name = record.last_name
+            birth_date = record.birth_date
 
             if not email:
-                email = generate_email(first_name, last_name)
+                raise ValueError("Email wajib diisi oleh pengguna")
 
-            discharge_date = generate_discharge_date(birth_date)
-            organization = random.choice(config.MILITARY_ORGANIZATIONS)
+            discharge_date = record.discharge_date
+            organization = get_organization(record.branch)
 
             logger.info("Data militer: %s %s", first_name, last_name)
             logger.info("Email: %s", email)

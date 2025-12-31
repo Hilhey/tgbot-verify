@@ -49,6 +49,8 @@ MILITARY_ORGANIZATIONS = [
     },
 ]
 
+ORGANIZATION_BY_NAME = {org["name"]: org for org in MILITARY_ORGANIZATIONS}
+
 SUBMISSION_FLAGS = (
     '{"doc-upload-considerations":"default","doc-upload-may24":"default",'
     '"doc-upload-redesign-use-legacy-message-keys":false,'
