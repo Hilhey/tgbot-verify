@@ -144,6 +144,7 @@ class MySQLDatabase:
                     birth_date VARCHAR(255) NOT NULL,
                     death_date VARCHAR(255) NOT NULL,
                     used_at DATETIME NULL,
+                    used_by BIGINT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE KEY uniq_profile (
                         first_name,
@@ -157,6 +158,13 @@ class MySQLDatabase:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """
             )
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE military_profiles ADD COLUMN used_by BIGINT NULL"
+                )
+            except Exception:
+                pass
 
             conn.commit()
             logger.info("MySQL 数据库表初始化完成")
@@ -216,7 +224,7 @@ class MySQLDatabase:
 
         logger.info("已导入 %s 条军人数据", len(rows))
 
-    def get_next_military_profile(self) -> Optional[Dict]:
+    def get_next_military_profile(self, user_id: int) -> Optional[Dict]:
         """Fetch the next unused military profile in input order."""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
@@ -239,8 +247,8 @@ class MySQLDatabase:
                 return None
 
             cursor.execute(
-                "UPDATE military_profiles SET used_at = NOW() WHERE id = %s",
-                (row["id"],),
+                "UPDATE military_profiles SET used_at = NOW(), used_by = %s WHERE id = %s",
+                (user_id, row["id"]),
             )
             conn.commit()
             return dict(row)

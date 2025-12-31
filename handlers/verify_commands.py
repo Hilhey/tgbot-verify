@@ -578,7 +578,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         await update.message.reply_text("扣除积分失败，请稍后重试。")
         return
 
-    profile = db.get_next_military_profile()
+    profile = db.get_next_military_profile(user_id)
     if not profile:
         db.add_balance(user_id, VERIFY_COST)
         await update.message.reply_text("暂无可用军人数据，请联系管理员补充。")
