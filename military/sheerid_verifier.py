@@ -2,6 +2,7 @@
 import logging
 import random
 import re
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 import httpx
@@ -81,24 +82,46 @@ class SheerIDVerifier:
             logger.error("S3 上传失败: %s", exc)
             return False
 
-    def _submit_personal_info(self, body: Dict) -> Tuple[Dict, int]:
-        """Submit personal info with a fallback step name."""
-        primary_step = "collectMilitaryPersonalInfo"
-        fallback_step = "collectStudentPersonalInfo"
+    @staticmethod
+    def _normalize_date(raw_date: str) -> str:
+        """Normalize date into YYYY-MM-DD."""
+        if not raw_date:
+            return ""
+        raw_date = raw_date.strip()
+        try:
+            return datetime.strptime(raw_date, "%Y-%m-%d").strftime("%Y-%m-%d")
+        except ValueError:
+            pass
 
-        step2_data, step2_status = self._sheerid_request(
-            "POST",
-            f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/{primary_step}",
-            body,
-        )
+        month_map = {
+            "januari": "01",
+            "februari": "02",
+            "maret": "03",
+            "april": "04",
+            "mei": "05",
+            "juni": "06",
+            "juli": "07",
+            "agustus": "08",
+            "september": "09",
+            "oktober": "10",
+            "november": "11",
+            "desember": "12",
+        }
+        parts = raw_date.replace(",", "").split()
+        if len(parts) == 3:
+            day, month_name, year = parts
+            month = month_map.get(month_name.lower())
+            if month:
+                return f"{year}-{month}-{day.zfill(2)}"
 
-        if step2_status != 404 and step2_data.get("errorIds") != ["notFound"]:
-            return step2_data, step2_status
+        return raw_date
 
-        logger.warning("步骤 %s 不存在，尝试 %s", primary_step, fallback_step)
+    def _collect_military_status(self) -> Tuple[Dict, int]:
+        """Collect military status before personal info submission."""
+        body = {"status": config.DEFAULT_STATUS}
         return self._sheerid_request(
             "POST",
-            f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/{fallback_step}",
+            f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/collectMilitaryStatus",
             body,
         )
 
@@ -130,6 +153,13 @@ class SheerIDVerifier:
                 email = generate_email(first_name, last_name, branch["domain"])
             if not birth_date:
                 birth_date = generate_birth_date()
+            birth_date = self._normalize_date(birth_date)
+
+            display_death_date = self._normalize_date(death_date) if death_date else ""
+            if display_death_date:
+                discharge_date = display_death_date
+            else:
+                discharge_date = datetime.utcnow().strftime("%Y-%m-%d")
 
             service_id = generate_service_id(first_name, last_name, birth_date)
             rank = rank or "Sergeant"
@@ -148,12 +178,21 @@ class SheerIDVerifier:
                 service_id,
                 rank,
                 birth_date,
-                death_date or "",
+                display_death_date,
             )
             file_size = len(img_data)
             logger.info("✅ PNG 大小: %.2fKB", file_size / 1024)
 
-            logger.info("步骤 2/3: 提交军人信息...")
+            logger.info("步骤 2/4: 收集军人状态...")
+            status_data, status_status = self._collect_military_status()
+            if status_status != 200:
+                raise Exception(f"步骤 2 失败 (状态码 {status_status}): {status_data}")
+
+            submission_url = status_data.get("submissionUrl")
+            if not submission_url:
+                raise Exception("步骤 2 失败: 未返回 submissionUrl")
+
+            logger.info("步骤 3/4: 提交军人信息...")
             step2_body = {
                 "firstName": first_name,
                 "lastName": last_name,
@@ -162,36 +201,53 @@ class SheerIDVerifier:
                 "phoneNumber": "",
                 "organization": {
                     "id": int(branch["id"]),
-                    "idExtended": branch["idExtended"],
                     "name": branch["name"],
                 },
-                "deviceFingerprintHash": self.device_fingerprint,
+                "dischargeDate": discharge_date,
                 "locale": "en-US",
+                "country": "US",
+                "deviceFingerprintHash": self.device_fingerprint,
                 "metadata": {
                     "marketConsentValue": False,
                     "refererUrl": f"{config.SHEERID_BASE_URL}/verify/{config.PROGRAM_ID}/?verificationId={self.verification_id}",
                     "verificationId": self.verification_id,
+                    "flags": (
+                        "{\"doc-upload-considerations\":\"default\","
+                        "\"doc-upload-may24\":\"default\","
+                        "\"doc-upload-redesign-use-legacy-message-keys\":false,"
+                        "\"docUpload-assertion-checklist\":\"default\","
+                        "\"include-cvec-field-france-student\":\"not-labeled-optional\","
+                        "\"org-search-overlay\":\"default\","
+                        "\"org-selected-display\":\"default\"}"
+                    ),
                     "submissionOptIn": (
                         "By submitting the personal information above, I acknowledge that my personal "
                         "information is being collected under the privacy policy of the business from "
-                        "which I am seeking a discount"
+                        "which I am seeking a discount, and I understand that my personal information "
+                        "will be shared with SheerID as a processor/third-party service provider in order "
+                        "for SheerID to confirm my eligibility for a special offer. Contact OpenAI Support "
+                        "for further assistance at support@openai.com"
                     ),
                 },
             }
 
-            step2_data, step2_status = self._submit_personal_info(step2_body)
+            step2_data, step2_status = self._sheerid_request(
+                "POST",
+                submission_url,
+                step2_body,
+            )
 
             if step2_status != 200:
-                raise Exception(f"步骤 2 失败 (状态码 {step2_status}): {step2_data}")
+                raise Exception(f"步骤 3 失败 (状态码 {step2_status}): {step2_data}")
             if step2_data.get("currentStep") == "error":
                 error_msg = ", ".join(step2_data.get("errorIds", ["Unknown error"]))
-                raise Exception(f"步骤 2 错误: {error_msg}")
+                raise Exception(f"步骤 3 错误: {error_msg}")
 
-            logger.info("✅ 步骤 2 完成: %s", step2_data.get("currentStep"))
+            logger.info("✅ 步骤 3 完成: %s", step2_data.get("currentStep"))
             current_step = step2_data.get("currentStep", current_step)
 
-            if current_step in ["sso", "collectMilitaryPersonalInfo"]:
-                logger.info("步骤 2.5/3: 跳过 SSO 验证...")
+            if current_step in ["sso", "collectInactiveMilitaryPersonalInfo"]:
+                logger.info("步骤 3.5/4: 跳过 SSO 验证...")
                 step_sso_data, _ = self._sheerid_request(
                     "DELETE",
                     f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/sso",
@@ -199,7 +255,7 @@ class SheerIDVerifier:
                 logger.info("✅ SSO 完成: %s", step_sso_data.get("currentStep"))
                 current_step = step_sso_data.get("currentStep", current_step)
 
-            logger.info("步骤 3/3: 请求并上传文档...")
+            logger.info("步骤 4/4: 请求并上传文档...")
             step3_body = {
                 "files": [
                     {
