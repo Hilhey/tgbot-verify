@@ -81,6 +81,27 @@ class SheerIDVerifier:
             logger.error("S3 上传失败: %s", exc)
             return False
 
+    def _submit_personal_info(self, body: Dict) -> Tuple[Dict, int]:
+        """Submit personal info with a fallback step name."""
+        primary_step = "collectMilitaryPersonalInfo"
+        fallback_step = "collectStudentPersonalInfo"
+
+        step2_data, step2_status = self._sheerid_request(
+            "POST",
+            f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/{primary_step}",
+            body,
+        )
+
+        if step2_status != 404 and step2_data.get("errorIds") != ["notFound"]:
+            return step2_data, step2_status
+
+        logger.warning("步骤 %s 不存在，尝试 %s", primary_step, fallback_step)
+        return self._sheerid_request(
+            "POST",
+            f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/{fallback_step}",
+            body,
+        )
+
     def verify(
         self,
         first_name: str = None,
@@ -158,11 +179,7 @@ class SheerIDVerifier:
                 },
             }
 
-            step2_data, step2_status = self._sheerid_request(
-                "POST",
-                f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/collectMilitaryPersonalInfo",
-                step2_body,
-            )
+            step2_data, step2_status = self._submit_personal_info(step2_body)
 
             if step2_status != 200:
                 raise Exception(f"步骤 2 失败 (状态码 {step2_status}): {step2_data}")
