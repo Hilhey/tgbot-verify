@@ -68,7 +68,7 @@ def get_help_message(is_admin: bool = False) -> str:
         f"/verify3 <链接> - Spotify Student 认证（-{VERIFY_COST}积分）\n"
         f"/verify4 <链接> - Bolt.new Teacher 认证（-{VERIFY_COST}积分）\n"
         f"/verify5 <链接> - YouTube Student Premium 认证（-{VERIFY_COST}积分）\n"
-        f"/verify6 <链接> - ChatGPT Military 认证（-{VERIFY_COST}积分）\n"
+        f"/verify6 <链接> <邮箱> - ChatGPT Military 认证（-{VERIFY_COST}积分）\n"
         "/getV4Code <verification_id> - 获取 Bolt.new 认证码\n"
         "/help - 查看此帮助信息\n"
         f"认证失败查看：{HELP_NOTION_URL}\n"

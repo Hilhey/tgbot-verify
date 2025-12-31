@@ -159,7 +159,7 @@ docker run -d \
 /verify3 <link>     # Spotify Student verification
 /verify4 <link>     # Bolt.new Teacher verification
 /verify5 <link>     # YouTube Premium Student verification
-/verify6 <link>     # ChatGPT Military verification
+/verify6 <link> <email>     # ChatGPT Military verification
 /getV4Code <id>     # Get Bolt.new verification code
 /help               # View help information
 ```

@@ -157,7 +157,7 @@ docker run -d \
 /verify3 <链接>     # Spotify Student 认证
 /verify4 <链接>     # Bolt.new Teacher 认证
 /verify5 <链接>     # YouTube Premium Student 认证
-/verify6 <链接>     # ChatGPT Military 认证
+/verify6 <链接> <邮箱>  # ChatGPT Military 认证
 /getV4Code <id>     # 获取 Bolt.new 认证码
 /help               # 查看帮助信息
 ```

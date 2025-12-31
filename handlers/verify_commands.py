@@ -555,13 +555,21 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         await update.message.reply_text("请先使用 /start 注册。")
         return
 
-    if not context.args:
+    if len(context.args) < 2:
         await update.message.reply_text(
-            get_verify_usage_message("/verify6", "ChatGPT Military")
+            "使用方法: /verify6 <SheerID链接> <邮箱>\n\n"
+            "示例:\n"
+            "/verify6 https://services.sheerid.com/verify/xxx/?verificationId=xxx user@example.com\n\n"
+            "获取验证链接:\n"
+            "1. 访问 ChatGPT Military 认证页面\n"
+            "2. 开始认证流程\n"
+            "3. 复制浏览器地址栏中的完整 URL\n"
+            "4. 使用 /verify6 命令提交"
         )
         return
 
     url = context.args[0]
+    email = context.args[1]
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -590,7 +598,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
     try:
         async with semaphore:
             verifier = MilitaryVerifier(verification_id)
-            result = await asyncio.to_thread(verifier.verify)
+            result = await asyncio.to_thread(verifier.verify, email=email)
 
         db.add_verification(
             user_id,
