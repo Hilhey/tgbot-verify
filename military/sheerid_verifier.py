@@ -1,0 +1,339 @@
+"""Program utama verifikasi militer SheerID"""
+import logging
+import re
+import secrets
+import time
+from urllib.parse import urlparse
+from typing import Dict, List, Optional, Tuple
+
+import httpx
+
+from . import config
+from .data_store import get_organization, pop_random_record
+from utils.http_client import create_client
+
+# Konfigurasi logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
+class SheerIDVerifier:
+    """Verifier identitas militer SheerID"""
+
+    def __init__(
+        self,
+        verification_id: str,
+        program_id: Optional[str] = None,
+        proxy: Optional[str] = None,
+    ):
+        self.verification_id = verification_id
+        self.program_id = program_id
+        self.http_client = create_client(timeout=30.0, proxy=proxy)
+
+    def __del__(self):
+        if hasattr(self, "http_client"):
+            self.http_client.close()
+
+    @staticmethod
+    def parse_verification_id(url: str) -> Optional[str]:
+        match = re.search(r"verificationId=([a-f0-9]+)", url, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        return None
+
+    @staticmethod
+    def parse_program_id(url: str) -> Optional[str]:
+        match = re.search(r"/verify/([^/]+)/", url)
+        if match:
+            return match.group(1)
+        return None
+
+    def _sheerid_request(
+        self, method: str, url: str, body: Optional[Dict] = None
+    ) -> Tuple[Dict, int]:
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        response = self.http_client.request(
+            method=method, url=url, json=body, headers=headers
+        )
+        try:
+            data = response.json()
+        except Exception:
+            data = response.text
+        return data, response.status_code
+
+    def _collect_military_status(self, status: str) -> Dict:
+        step1_body = {"status": status}
+        step1_data, step1_status = self._sheerid_request(
+            "POST",
+            f"{config.SHEERID_BASE_URL}/rest/v2/verification/{self.verification_id}/step/collectMilitaryStatus",
+            step1_body,
+        )
+        if step1_status != 200:
+            raise Exception(f"collectMilitaryStatus gagal (kode status {step1_status}): {step1_data}")
+        if step1_data.get("currentStep") == "error":
+            error_msg = ", ".join(step1_data.get("errorIds", ["Unknown error"]))
+            raise Exception(f"collectMilitaryStatus error: {error_msg}")
+        return step1_data
+
+    def _collect_personal_info(self, submission_url: str, payload: Dict) -> Dict:
+        step2_data, step2_status = self._sheerid_request("POST", submission_url, payload)
+        if step2_status != 200:
+            raise Exception(
+                f"collectInactiveMilitaryPersonalInfo gagal (kode status {step2_status}): {step2_data}"
+            )
+        if step2_data.get("currentStep") == "error":
+            error_msg = ", ".join(step2_data.get("errorIds", ["Unknown error"]))
+            raise Exception(f"collectInactiveMilitaryPersonalInfo error: {error_msg}")
+        return step2_data
+
+    def _create_tempmail(self) -> Tuple[str, str]:
+        domains_response = self.http_client.get(f"{config.TEMPMAIL_API_BASE}domains")
+        domains_response.raise_for_status()
+        domains = domains_response.json().get("hydra:member", [])
+        if not domains:
+            raise Exception("Domain tempmail tidak tersedia")
+        domain = domains[0]["domain"]
+
+        for _ in range(3):
+            local_part = secrets.token_hex(4)
+            email = f"{local_part}@{domain}"
+            password = secrets.token_urlsafe(12)
+            account_response = self.http_client.post(
+                f"{config.TEMPMAIL_API_BASE}accounts",
+                json={"address": email, "password": password},
+            )
+            if account_response.status_code == 201:
+                break
+        else:
+            raise Exception("Gagal membuat akun tempmail")
+
+        token_response = self.http_client.post(
+            f"{config.TEMPMAIL_API_BASE}token",
+            json={"address": email, "password": password},
+        )
+        token_response.raise_for_status()
+        token = token_response.json().get("token")
+        if not token:
+            raise Exception("Token tempmail tidak ditemukan")
+
+        return token, email
+
+    def _fetch_tempmail_messages(self, token: str) -> List[Dict]:
+        response = self.http_client.get(
+            f"{config.TEMPMAIL_API_BASE}messages",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        response.raise_for_status()
+        return response.json().get("hydra:member", [])
+
+    def _fetch_tempmail_message(self, token: str, msg_id: str) -> Dict:
+        response = self.http_client.get(
+            f"{config.TEMPMAIL_API_BASE}messages/{msg_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _extract_verification_link(text: str) -> Optional[str]:
+        if not text:
+            return None
+        for match in re.findall(r"https?://[^\\s\"'<>]+", text):
+            if "sheerid" in match and "verification" in match:
+                return match.rstrip(").,")
+        return None
+
+    def _await_verification_link(self, token: str) -> Optional[str]:
+        deadline = time.time() + config.TEMPMAIL_POLL_TIMEOUT
+        seen_ids = set()
+        while time.time() < deadline:
+            try:
+                messages = self._fetch_tempmail_messages(token)
+            except Exception as exc:
+                logger.warning("Gagal cek inbox tempmail: %s", exc)
+                time.sleep(config.TEMPMAIL_POLL_INTERVAL)
+                continue
+
+            for message in messages:
+                msg_id = message.get("id")
+                if msg_id in seen_ids:
+                    continue
+                seen_ids.add(msg_id)
+                try:
+                    full_msg = self._fetch_tempmail_message(token, msg_id)
+                except Exception as exc:
+                    logger.warning("Gagal baca email tempmail: %s", exc)
+                    continue
+                body_parts = []
+                if isinstance(full_msg.get("text"), list):
+                    body_parts.extend(full_msg.get("text", []))
+                if isinstance(full_msg.get("html"), list):
+                    body_parts.extend(full_msg.get("html", []))
+                if full_msg.get("intro"):
+                    body_parts.append(full_msg.get("intro"))
+                body = "\n".join(body_parts)
+                link = self._extract_verification_link(body)
+                if link:
+                    return link
+
+            time.sleep(config.TEMPMAIL_POLL_INTERVAL)
+        return None
+
+    def verify(
+        self,
+        first_name: str = None,
+        last_name: str = None,
+        email: str = None,
+        birth_date: str = None,
+        use_tempmail: bool = False,
+    ) -> Dict:
+        """Jalankan alur verifikasi militer"""
+        try:
+            record = pop_random_record()
+            first_name = record.first_name
+            last_name = record.last_name
+            birth_date = record.birth_date
+
+            tempmail_token = None
+            if use_tempmail:
+                tempmail_token, email = self._create_tempmail()
+            elif not email:
+                raise ValueError("Email wajib diisi oleh pengguna")
+
+            discharge_date = record.discharge_date
+            organization = get_organization(record.branch)
+
+            logger.info("Data militer: %s %s", first_name, last_name)
+            logger.info("Email: %s", email)
+            logger.info("Tanggal lahir: %s", birth_date)
+            logger.info("Tanggal pensiun: %s", discharge_date)
+            logger.info("Organisasi: %s", organization["name"])
+            logger.info("ID verifikasi: %s", self.verification_id)
+
+            logger.info("Langkah 1/2: mengumpulkan status militer...")
+            step1_data = self._collect_military_status(config.MILITARY_STATUS)
+            submission_url = step1_data.get("submissionUrl")
+            if not submission_url:
+                raise Exception("submissionUrl tidak ditemukan")
+
+            logger.info("Langkah 2/2: mengirim data pribadi militer...")
+            step2_body = {
+                "firstName": first_name,
+                "lastName": last_name,
+                "birthDate": birth_date,
+                "email": email,
+                "phoneNumber": "",
+                "organization": {
+                    "id": organization["id"],
+                    "name": organization["name"],
+                },
+                "dischargeDate": discharge_date,
+                "locale": "en-US",
+                "country": "US",
+                "metadata": {
+                    "marketConsentValue": False,
+                    "refererUrl": "",
+                    "verificationId": self.verification_id,
+                    "flags": config.SUBMISSION_FLAGS,
+                    "submissionOptIn": config.SUBMISSION_OPT_IN,
+                },
+            }
+
+            step2_data = self._collect_personal_info(submission_url, step2_body)
+            current_step = step2_data.get("currentStep")
+            logger.info("✅ Pengiriman data pribadi selesai: %s", current_step)
+
+            redirect_url = step2_data.get("redirectUrl")
+            if redirect_url and self.program_id:
+                if redirect_url.startswith("?") or redirect_url.startswith("http:/?") or redirect_url.startswith("/?"):
+                    query = redirect_url.split("?", 1)[-1]
+                    redirect_url = (
+                        f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{query}"
+                    )
+                else:
+                    parsed = urlparse(redirect_url)
+                    if not parsed.netloc and parsed.query:
+                        redirect_url = (
+                            f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{parsed.query}"
+                        )
+
+            verification_link = None
+            email_verified = False
+            if use_tempmail and tempmail_token:
+                logger.info("Menunggu email verifikasi di tempmail...")
+                verification_link = self._await_verification_link(tempmail_token)
+                if verification_link:
+                    logger.info("Menemukan link verifikasi email, membuka tautan...")
+                    self.http_client.get(verification_link)
+                    email_verified = True
+                else:
+                    logger.warning("Link verifikasi tidak ditemukan dalam waktu tunggu.")
+
+            return {
+                "success": True,
+                "pending": current_step not in {"success", "complete"},
+                "message": "Informasi militer sudah dikirim",
+                "verification_id": self.verification_id,
+                "redirect_url": redirect_url,
+                "email": email,
+                "email_verified": email_verified,
+                "verification_link": verification_link,
+                "status": step2_data,
+            }
+
+        except Exception as e:
+            logger.error("❌ Verifikasi gagal: %s", e)
+            return {"success": False, "message": str(e), "verification_id": self.verification_id}
+
+
+def main():
+    """Fungsi utama - CLI"""
+    import sys
+
+    print("=" * 60)
+    print("Alat verifikasi militer SheerID (Python)")
+    print("=" * 60)
+    print()
+
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
+    else:
+        url = input("Masukkan URL verifikasi SheerID: ").strip()
+
+    if not url:
+        print("❌ Error: URL tidak diberikan")
+        sys.exit(1)
+
+    verification_id = SheerIDVerifier.parse_verification_id(url)
+    if not verification_id:
+        print("❌ Error: format ID verifikasi tidak valid")
+        sys.exit(1)
+
+    print(f"✅ Berhasil mengambil ID verifikasi: {verification_id}")
+    print()
+
+    verifier = SheerIDVerifier(verification_id)
+    result = verifier.verify()
+
+    print()
+    print("=" * 60)
+    print("Hasil verifikasi:")
+    print("=" * 60)
+    print(f"Status: {'✅ Berhasil' if result['success'] else '❌ Gagal'}")
+    print(f"Pesan: {result['message']}")
+    if result.get("redirect_url"):
+        print(f"Tautan lanjut: {result['redirect_url']}")
+    print("=" * 60)
+
+    return 0 if result["success"] else 1
+
+
+if __name__ == "__main__":
+    exit(main())

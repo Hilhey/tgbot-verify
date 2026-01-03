@@ -1,23 +1,34 @@
-"""全局配置文件"""
+"""Konfigurasi global"""
 import os
 from dotenv import load_dotenv
 
-# 加载 .env 文件
+# Memuat file .env
 load_dotenv()
 
-# Telegram Bot 配置
+# Konfigurasi bot Telegram
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "pk_oa")
 CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/pk_oa")
 
-# 管理员配置
-ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "123456789"))
+# Konfigurasi admin
+def _get_int_env(name: str, default: int) -> int:
+    """Ambil nilai integer dari env dengan fallback default."""
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
-# 积分配置
-VERIFY_COST = 1  # 验证消耗的积分
-CHECKIN_REWARD = 1  # 签到奖励积分
-INVITE_REWARD = 2  # 邀请奖励积分
-REGISTER_REWARD = 1  # 注册奖励积分
 
-# 帮助链接
+ADMIN_USER_ID = _get_int_env("ADMIN_USER_ID", 5463047605)
+
+# Konfigurasi poin
+VERIFY_COST = 1  # biaya poin untuk verifikasi
+CHECKIN_REWARD = 1  # reward check-in
+INVITE_REWARD = 2  # reward undangan
+REGISTER_REWARD = 1  # reward registrasi
+
+# Tautan bantuan
 HELP_NOTION_URL = "https://rhetorical-era-3f3.notion.site/dd78531dbac745af9bbac156b51da9cc"

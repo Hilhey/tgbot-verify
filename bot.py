@@ -1,8 +1,8 @@
-"""Telegram 机器人主程序"""
+"""Program utama bot Telegram"""
 import logging
 from functools import partial
 
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from config import BOT_TOKEN
 from database_mysql import Database
@@ -21,6 +21,8 @@ from handlers.verify_commands import (
     verify3_command,
     verify4_command,
     verify5_command,
+    verify6_command,
+    verify6_text_handler,
     getV4Code_command,
 )
 from handlers.admin_commands import (
@@ -33,7 +35,7 @@ from handlers.admin_commands import (
     broadcast_command,
 )
 
-# 配置日志
+# Konfigurasi logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
@@ -42,24 +44,24 @@ logger = logging.getLogger(__name__)
 
 
 async def error_handler(update: object, context) -> None:
-    """全局错误处理"""
-    logger.exception("处理更新时发生异常: %s", context.error, exc_info=context.error)
+    """Penanganan error global"""
+    logger.exception("Terjadi error saat memproses update: %s", context.error, exc_info=context.error)
 
 
 def main():
-    """主函数"""
-    # 初始化数据库
+    """Fungsi utama"""
+    # Inisialisasi database
     db = Database()
 
-    # 创建应用 - 启用并发处理
+    # Buat aplikasi - aktifkan pemrosesan konkruen
     application = (
         Application.builder()
         .token(BOT_TOKEN)
-        .concurrent_updates(True)  # 🔥 关键：启用并发处理多个命令
+        .concurrent_updates(True)  # 🔥 Kunci: aktifkan pemrosesan konkruen untuk banyak perintah
         .build()
     )
 
-    # 注册用户命令（使用 partial 传递 db 参数）
+    # Daftarkan perintah pengguna (gunakan partial untuk meneruskan db)
     application.add_handler(CommandHandler("start", partial(start_command, db=db)))
     application.add_handler(CommandHandler("about", partial(about_command, db=db)))
     application.add_handler(CommandHandler("help", partial(help_command, db=db)))
@@ -68,15 +70,19 @@ def main():
     application.add_handler(CommandHandler("invite", partial(invite_command, db=db)))
     application.add_handler(CommandHandler("use", partial(use_command, db=db)))
 
-    # 注册验证命令
+    # Daftarkan perintah verifikasi
     application.add_handler(CommandHandler("verify", partial(verify_command, db=db)))
     application.add_handler(CommandHandler("verify2", partial(verify2_command, db=db)))
     application.add_handler(CommandHandler("verify3", partial(verify3_command, db=db)))
     application.add_handler(CommandHandler("verify4", partial(verify4_command, db=db)))
     application.add_handler(CommandHandler("verify5", partial(verify5_command, db=db)))
+    application.add_handler(CommandHandler("verify6", partial(verify6_command, db=db)))
     application.add_handler(CommandHandler("getV4Code", partial(getV4Code_command, db=db)))
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, partial(verify6_text_handler, db=db))
+    )
 
-    # 注册管理员命令
+    # Daftarkan perintah admin
     application.add_handler(CommandHandler("addbalance", partial(addbalance_command, db=db)))
     application.add_handler(CommandHandler("block", partial(block_command, db=db)))
     application.add_handler(CommandHandler("white", partial(white_command, db=db)))
@@ -85,10 +91,10 @@ def main():
     application.add_handler(CommandHandler("listkeys", partial(listkeys_command, db=db)))
     application.add_handler(CommandHandler("broadcast", partial(broadcast_command, db=db)))
 
-    # 注册错误处理器
+    # Daftarkan handler error
     application.add_error_handler(error_handler)
 
-    logger.info("机器人启动中...")
+    logger.info("Bot sedang berjalan...")
     application.run_polling(drop_pending_updates=True)
 
 

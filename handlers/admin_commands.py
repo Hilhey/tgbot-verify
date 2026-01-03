@@ -1,4 +1,4 @@
-"""管理员命令处理器"""
+"""Pengendali perintah admin"""
 import asyncio
 import logging
 from datetime import datetime
@@ -14,19 +14,19 @@ logger = logging.getLogger(__name__)
 
 
 async def addbalance_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /addbalance 命令 - 管理员增加积分"""
+    """Menangani perintah /addbalance - admin menambah poin"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
 
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     if not context.args or len(context.args) < 2:
         await update.message.reply_text(
-            "使用方法: /addbalance <用户ID> <积分数量>\n\n示例: /addbalance 123456789 10"
+            "Cara penggunaan: /addbalance <user_id> <jumlah_poin>\n\nContoh: /addbalance 123456789 10"
         )
         return
 
@@ -35,35 +35,35 @@ async def addbalance_command(update: Update, context: ContextTypes.DEFAULT_TYPE,
         amount = int(context.args[1])
 
         if not db.user_exists(target_user_id):
-            await update.message.reply_text("用户不存在。")
+            await update.message.reply_text("Pengguna tidak ditemukan.")
             return
 
         if db.add_balance(target_user_id, amount):
             user = db.get_user(target_user_id)
             await update.message.reply_text(
-                f"✅ 成功为用户 {target_user_id} 增加 {amount} 积分。\n"
-                f"当前积分：{user['balance']}"
+                f"✅ Berhasil menambah {amount} poin untuk pengguna {target_user_id}.\n"
+                f"Poin saat ini: {user['balance']}"
             )
         else:
-            await update.message.reply_text("操作失败，请稍后重试。")
+            await update.message.reply_text("Operasi gagal, silakan coba lagi nanti.")
     except ValueError:
-        await update.message.reply_text("参数格式错误，请输入有效的数字。")
+        await update.message.reply_text("Format parameter salah, silakan masukkan angka yang valid.")
 
 
 async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /block 命令 - 管理员拉黑用户"""
+    """Menangani perintah /block - admin memblokir pengguna"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
 
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     if not context.args:
         await update.message.reply_text(
-            "使用方法: /block <用户ID>\n\n示例: /block 123456789"
+            "Cara penggunaan: /block <user_id>\n\nContoh: /block 123456789"
         )
         return
 
@@ -71,31 +71,31 @@ async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: 
         target_user_id = int(context.args[0])
 
         if not db.user_exists(target_user_id):
-            await update.message.reply_text("用户不存在。")
+            await update.message.reply_text("Pengguna tidak ditemukan.")
             return
 
         if db.block_user(target_user_id):
-            await update.message.reply_text(f"✅ 已拉黑用户 {target_user_id}。")
+            await update.message.reply_text(f"✅ Pengguna {target_user_id} telah diblokir.")
         else:
-            await update.message.reply_text("操作失败，请稍后重试。")
+            await update.message.reply_text("Operasi gagal, silakan coba lagi nanti.")
     except ValueError:
-        await update.message.reply_text("参数格式错误，请输入有效的用户ID。")
+        await update.message.reply_text("Format parameter salah, silakan masukkan user_id yang valid.")
 
 
 async def white_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /white 命令 - 管理员取消拉黑"""
+    """Menangani perintah /white - admin membuka blokir"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
 
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     if not context.args:
         await update.message.reply_text(
-            "使用方法: /white <用户ID>\n\n示例: /white 123456789"
+            "Cara penggunaan: /white <user_id>\n\nContoh: /white 123456789"
         )
         return
 
@@ -103,62 +103,62 @@ async def white_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: 
         target_user_id = int(context.args[0])
 
         if not db.user_exists(target_user_id):
-            await update.message.reply_text("用户不存在。")
+            await update.message.reply_text("Pengguna tidak ditemukan.")
             return
 
         if db.unblock_user(target_user_id):
-            await update.message.reply_text(f"✅ 已将用户 {target_user_id} 移出黑名单。")
+            await update.message.reply_text(f"✅ Pengguna {target_user_id} telah dikeluarkan dari daftar blokir.")
         else:
-            await update.message.reply_text("操作失败，请稍后重试。")
+            await update.message.reply_text("Operasi gagal, silakan coba lagi nanti.")
     except ValueError:
-        await update.message.reply_text("参数格式错误，请输入有效的用户ID。")
+        await update.message.reply_text("Format parameter salah, silakan masukkan user_id yang valid.")
 
 
 async def blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /blacklist 命令 - 查看黑名单"""
+    """Menangani perintah /blacklist - melihat daftar blokir"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
 
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     blacklist = db.get_blacklist()
 
     if not blacklist:
-        await update.message.reply_text("黑名单为空。")
+        await update.message.reply_text("Daftar blokir kosong.")
         return
 
-    msg = "📋 黑名单列表：\n\n"
+    msg = "📋 Daftar blokir:\n\n"
     for user in blacklist:
-        msg += f"用户ID: {user['user_id']}\n"
-        msg += f"用户名: @{user['username']}\n"
-        msg += f"姓名: {user['full_name']}\n"
+        msg += f"User ID: {user['user_id']}\n"
+        msg += f"Username: @{user['username']}\n"
+        msg += f"Nama: {user['full_name']}\n"
         msg += "---\n"
 
     await update.message.reply_text(msg)
 
 
 async def genkey_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /genkey 命令 - 管理员生成卡密"""
+    """Menangani perintah /genkey - admin membuat kode"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
 
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     if not context.args or len(context.args) < 2:
         await update.message.reply_text(
-            "使用方法: /genkey <卡密> <积分> [使用次数] [过期天数]\n\n"
-            "示例:\n"
-            "/genkey wandouyu 20 - 生成20积分的卡密（单次使用，永不过期）\n"
-            "/genkey vip100 50 10 - 生成50积分的卡密（可使用10次，永不过期）\n"
-            "/genkey temp 30 1 7 - 生成30积分的卡密（单次使用，7天后过期）"
+            "Cara penggunaan: /genkey <kode> <poin> [jumlah_penggunaan] [hari_kedaluwarsa]\n\n"
+            "Contoh:\n"
+            "/genkey wandouyu 20 - buat kode 20 poin (sekali pakai, tidak kedaluwarsa)\n"
+            "/genkey vip100 50 10 - buat kode 50 poin (bisa dipakai 10x, tidak kedaluwarsa)\n"
+            "/genkey temp 30 1 7 - buat kode 30 poin (sekali pakai, kedaluwarsa 7 hari)"
         )
         return
 
@@ -169,81 +169,81 @@ async def genkey_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db:
         expire_days = int(context.args[3]) if len(context.args) > 3 else None
 
         if balance <= 0:
-            await update.message.reply_text("积分数量必须大于0。")
+            await update.message.reply_text("Jumlah poin harus lebih dari 0.")
             return
 
         if max_uses <= 0:
-            await update.message.reply_text("使用次数必须大于0。")
+            await update.message.reply_text("Jumlah penggunaan harus lebih dari 0.")
             return
 
         if db.create_card_key(key_code, balance, user_id, max_uses, expire_days):
             msg = (
-                "✅ 卡密生成成功！\n\n"
-                f"卡密：{key_code}\n"
-                f"积分：{balance}\n"
-                f"使用次数：{max_uses}次\n"
+                "✅ Kode berhasil dibuat!\n\n"
+                f"Kode: {key_code}\n"
+                f"Poin: {balance}\n"
+                f"Jumlah penggunaan: {max_uses}x\n"
             )
             if expire_days:
-                msg += f"有效期：{expire_days}天\n"
+                msg += f"Berlaku: {expire_days} hari\n"
             else:
-                msg += "有效期：永久\n"
-            msg += f"\n用户使用方法: /use {key_code}"
+                msg += "Berlaku: permanen\n"
+            msg += f"\nCara penggunaan untuk user: /use {key_code}"
             await update.message.reply_text(msg)
         else:
-            await update.message.reply_text("卡密已存在或生成失败，请更换卡密名称。")
+            await update.message.reply_text("Kode sudah ada atau gagal dibuat, silakan gunakan nama kode lain.")
     except ValueError:
-        await update.message.reply_text("参数格式错误，请输入有效的数字。")
+        await update.message.reply_text("Format parameter salah, silakan masukkan angka yang valid.")
 
 
 async def listkeys_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /listkeys 命令 - 管理员查看卡密列表"""
+    """Menangani perintah /listkeys - admin melihat daftar kode"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
 
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     keys = db.get_all_card_keys()
 
     if not keys:
-        await update.message.reply_text("暂无卡密。")
+        await update.message.reply_text("Belum ada kode.")
         return
 
-    msg = "📋 卡密列表：\n\n"
-    for key in keys[:20]:  # 只显示前20个
-        msg += f"卡密：{key['key_code']}\n"
-        msg += f"积分：{key['balance']}\n"
-        msg += f"使用次数：{key['current_uses']}/{key['max_uses']}\n"
+    msg = "📋 Daftar kode:\n\n"
+    for key in keys[:20]:  # hanya tampilkan 20 teratas
+        msg += f"Kode: {key['key_code']}\n"
+        msg += f"Poin: {key['balance']}\n"
+        msg += f"Jumlah penggunaan: {key['current_uses']}/{key['max_uses']}\n"
 
         if key["expire_at"]:
             expire_time = datetime.fromisoformat(key["expire_at"])
             if datetime.now() > expire_time:
-                msg += "状态：已过期\n"
+                msg += "Status: kedaluwarsa\n"
             else:
                 days_left = (expire_time - datetime.now()).days
-                msg += f"状态：有效（剩余{days_left}天）\n"
+                msg += f"Status: aktif (sisa {days_left} hari)\n"
         else:
-            msg += "状态：永久有效\n"
+            msg += "Status: aktif permanen\n"
 
         msg += "---\n"
 
     if len(keys) > 20:
-        msg += f"\n（仅显示前20个，共{len(keys)}个）"
+        msg += f"\n(Hanya menampilkan 20 teratas, total {len(keys)} kode)"
 
     await update.message.reply_text(msg)
 
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
-    """处理 /broadcast 命令 - 管理员群发通知"""
+    """Menangani perintah /broadcast - admin mengirim pesan massal"""
     if await reject_group_command(update):
         return
 
     user_id = update.effective_user.id
     if user_id != ADMIN_USER_ID:
-        await update.message.reply_text("您没有权限使用此命令。")
+        await update.message.reply_text("Anda tidak memiliki izin untuk menggunakan perintah ini.")
         return
 
     text = " ".join(context.args).strip() if context.args else ""
@@ -251,21 +251,21 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         text = update.message.reply_to_message.text or ""
 
     if not text:
-        await update.message.reply_text("使用方法: /broadcast <文本>，或回复一条消息后发送 /broadcast")
+        await update.message.reply_text("Cara penggunaan: /broadcast <teks>, atau balas pesan lalu kirim /broadcast")
         return
 
     user_ids = db.get_all_user_ids()
     success, failed = 0, 0
 
-    status_msg = await update.message.reply_text(f"📢 开始广播，共 {len(user_ids)} 个用户...")
+    status_msg = await update.message.reply_text(f"📢 Mulai broadcast, total {len(user_ids)} pengguna...")
 
     for uid in user_ids:
         try:
             await context.bot.send_message(chat_id=uid, text=text)
             success += 1
-            await asyncio.sleep(0.05)  # 适当限速避免触发限制
+            await asyncio.sleep(0.05)  # batasi agar tidak terkena limit
         except Exception as e:
-            logger.warning("广播到 %s 失败: %s", uid, e)
+            logger.warning("Broadcast ke %s gagal: %s", uid, e)
             failed += 1
 
-    await status_msg.edit_text(f"✅ 广播完成！\n成功：{success}\n失败：{failed}")
+    await status_msg.edit_text(f"✅ Broadcast selesai!\nBerhasil: {success}\nGagal: {failed}")

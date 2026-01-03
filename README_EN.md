@@ -9,7 +9,7 @@
 > 
 > Based on [@auto_sheerid_bot](https://t.me/auto_sheerid_bot) GGBond's legacy code with improvements
 
-[中文文档](README.md) | English
+[Dokumentasi Bahasa Indonesia](README.md) | English
 
 ---
 
@@ -26,6 +26,7 @@ A Python-based Telegram bot that automates SheerID student/teacher identity veri
 | `/verify3` | Spotify Student | Student | ✅ Complete | Spotify Student Subscription Discount |
 | `/verify4` | Bolt.new Teacher | Teacher | ✅ Complete | Bolt.new Education Discount (Auto code retrieval) |
 | `/verify5` | YouTube Premium Student | Student | ⚠️ Beta | YouTube Premium Student Discount (See notes below) |
+| `/verify6` | ChatGPT Military | Military | ✅ Complete | ChatGPT Military Discount |
 
 > **⚠️ YouTube Verification Special Notes**:
 > 
@@ -42,7 +43,7 @@ A Python-based Telegram bot that automates SheerID student/teacher identity veri
 > 3. Start verification process, search for `https://services.sheerid.com/rest/v2/verification/`
 > 4. Extract `programId` from request payload and `verificationId` from response
 > 5. Manually construct link: `https://services.sheerid.com/verify/{programId}/?verificationId={verificationId}`
-> 6. Submit the link using `/verify5` command
+> 6. Submit the link using `/verify5` or `/verify6` command
 
 ### ✨ Key Features
 
@@ -96,7 +97,7 @@ ADMIN_USER_ID=your_admin_id
 
 # MySQL Database Configuration
 MYSQL_HOST=localhost
-MYSQL_PORT=3306
+MYSQL_PORT=3307
 MYSQL_USER=root
 MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=tgbot_verify
@@ -158,6 +159,7 @@ docker run -d \
 /verify3 <link>     # Spotify Student verification
 /verify4 <link>     # Bolt.new Teacher verification
 /verify5 <link>     # YouTube Premium Student verification
+/verify6 <link> <email>     # ChatGPT Military verification
 /getV4Code <id>     # Get Bolt.new verification code
 /help               # View help information
 ```
@@ -237,7 +239,7 @@ tgbot-verify/
 | `CHANNEL_URL` | ❌ | Channel link | https://t.me/pk_oa |
 | `ADMIN_USER_ID` | ✅ | Admin Telegram ID | - |
 | `MYSQL_HOST` | ✅ | MySQL host address | localhost |
-| `MYSQL_PORT` | ❌ | MySQL port | 3306 |
+| `MYSQL_PORT` | ❌ | MySQL port | 3307 |
 | `MYSQL_USER` | ✅ | MySQL username | - |
 | `MYSQL_PASSWORD` | ✅ | MySQL password | - |
 | `MYSQL_DATABASE` | ✅ | Database name | tgbot_verify |

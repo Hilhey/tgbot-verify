@@ -1,6 +1,6 @@
-"""MySQL 数据库实现
+"""Implementasi database MySQL
 
-使用提供的MySQL服务器进行数据存储
+Menggunakan server MySQL untuk penyimpanan data.
 """
 import logging
 from datetime import datetime, timedelta
@@ -9,43 +9,43 @@ import pymysql
 from pymysql.cursors import DictCursor
 from dotenv import load_dotenv
 
-# 加载环境变量
+# Memuat environment variable
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 
 class MySQLDatabase:
-    """MySQL 数据库管理类"""
+    """Kelas manajemen database MySQL"""
 
     def __init__(self):
-        """初始化数据库连接"""
+        """Inisialisasi koneksi database"""
         import os
         
-        # 从环境变量读取配置（推荐）或使用默认值
+        # Ambil konfigurasi dari environment (disarankan) atau gunakan default
         self.config = {
             'host': os.getenv('MYSQL_HOST', 'localhost'),
-            'port': int(os.getenv('MYSQL_PORT', 3306)),
+            'port': int(os.getenv('MYSQL_PORT', 3307)),
             'user': os.getenv('MYSQL_USER', 'tgbot_user'),
             'password': os.getenv('MYSQL_PASSWORD', 'your_password_here'),
             'database': os.getenv('MYSQL_DATABASE', 'tgbot_verify'),
             'charset': 'utf8mb4',
             'autocommit': False,
         }
-        logger.info(f"MySQL 数据库初始化: {self.config['user']}@{self.config['host']}/{self.config['database']}")
+        logger.info(f"Inisialisasi database MySQL: {self.config['user']}@{self.config['host']}/{self.config['database']}")
         self.init_database()
 
     def get_connection(self):
-        """获取数据库连接"""
+        """Ambil koneksi database"""
         return pymysql.connect(**self.config)
 
     def init_database(self):
-        """初始化数据库表结构"""
+        """Inisialisasi struktur tabel database"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
         try:
-            # 用户表
+            # Tabel users
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
@@ -63,7 +63,7 @@ class MySQLDatabase:
                 """
             )
 
-            # 邀请记录表
+            # Tabel invitations
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS invitations (
@@ -79,7 +79,7 @@ class MySQLDatabase:
                 """
             )
 
-            # 验证记录表
+            # Tabel verifications
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS verifications (
@@ -99,7 +99,7 @@ class MySQLDatabase:
                 """
             )
 
-            # 卡密表
+            # Tabel card_keys
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS card_keys (
@@ -117,7 +117,7 @@ class MySQLDatabase:
                 """
             )
 
-            # 卡密使用记录
+            # Tabel card_key_usage
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS card_key_usage (
@@ -132,10 +132,10 @@ class MySQLDatabase:
             )
 
             conn.commit()
-            logger.info("MySQL 数据库表初始化完成")
+            logger.info("Inisialisasi tabel MySQL selesai")
 
         except Exception as e:
-            logger.error(f"初始化数据库失败: {e}")
+            logger.error(f"Gagal inisialisasi database: {e}")
             conn.rollback()
             raise
         finally:
@@ -145,7 +145,7 @@ class MySQLDatabase:
     def create_user(
         self, user_id: int, username: str, full_name: str, invited_by: Optional[int] = None
     ) -> bool:
-        """创建新用户"""
+        """Buat pengguna baru"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -179,7 +179,7 @@ class MySQLDatabase:
             conn.rollback()
             return False
         except Exception as e:
-            logger.error(f"创建用户失败: {e}")
+            logger.error(f"Gagal membuat pengguna: {e}")
             conn.rollback()
             return False
         finally:
@@ -187,7 +187,7 @@ class MySQLDatabase:
             conn.close()
 
     def get_user(self, user_id: int) -> Optional[Dict]:
-        """获取用户信息"""
+        """Ambil info pengguna"""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
 
@@ -196,7 +196,7 @@ class MySQLDatabase:
             row = cursor.fetchone()
             
             if row:
-                # 创建新字典并转换datetime为ISO格式字符串
+                # Buat dict baru dan ubah datetime ke format ISO string
                 result = dict(row)
                 if result.get('created_at'):
                     result['created_at'] = result['created_at'].isoformat()
@@ -210,16 +210,16 @@ class MySQLDatabase:
             conn.close()
 
     def user_exists(self, user_id: int) -> bool:
-        """检查用户是否存在"""
+        """Cek apakah pengguna ada"""
         return self.get_user(user_id) is not None
 
     def is_user_blocked(self, user_id: int) -> bool:
-        """检查用户是否被拉黑"""
+        """Cek apakah pengguna diblokir"""
         user = self.get_user(user_id)
         return user and user["is_blocked"] == 1
 
     def block_user(self, user_id: int) -> bool:
-        """拉黑用户"""
+        """Blokir pengguna"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -228,7 +228,7 @@ class MySQLDatabase:
             conn.commit()
             return True
         except Exception as e:
-            logger.error(f"拉黑用户失败: {e}")
+            logger.error(f"Gagal memblokir pengguna: {e}")
             conn.rollback()
             return False
         finally:
@@ -236,7 +236,7 @@ class MySQLDatabase:
             conn.close()
 
     def unblock_user(self, user_id: int) -> bool:
-        """取消拉黑用户"""
+        """Buka blokir pengguna"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -245,7 +245,7 @@ class MySQLDatabase:
             conn.commit()
             return True
         except Exception as e:
-            logger.error(f"取消拉黑失败: {e}")
+            logger.error(f"Gagal membuka blokir: {e}")
             conn.rollback()
             return False
         finally:
@@ -253,7 +253,7 @@ class MySQLDatabase:
             conn.close()
 
     def get_blacklist(self) -> List[Dict]:
-        """获取黑名单列表"""
+        """Ambil daftar blokir"""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
 
@@ -265,7 +265,7 @@ class MySQLDatabase:
             conn.close()
 
     def add_balance(self, user_id: int, amount: int) -> bool:
-        """增加用户积分"""
+        """Tambah poin pengguna"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -277,7 +277,7 @@ class MySQLDatabase:
             conn.commit()
             return True
         except Exception as e:
-            logger.error(f"增加积分失败: {e}")
+            logger.error(f"Gagal menambah poin: {e}")
             conn.rollback()
             return False
         finally:
@@ -285,7 +285,7 @@ class MySQLDatabase:
             conn.close()
 
     def deduct_balance(self, user_id: int, amount: int) -> bool:
-        """扣除用户积分"""
+        """Kurangi poin pengguna"""
         user = self.get_user(user_id)
         if not user or user["balance"] < amount:
             return False
@@ -301,7 +301,7 @@ class MySQLDatabase:
             conn.commit()
             return True
         except Exception as e:
-            logger.error(f"扣除积分失败: {e}")
+            logger.error(f"Gagal mengurangi poin: {e}")
             conn.rollback()
             return False
         finally:
@@ -309,7 +309,7 @@ class MySQLDatabase:
             conn.close()
 
     def can_checkin(self, user_id: int) -> bool:
-        """检查用户今天是否可以签到"""
+        """Cek apakah pengguna bisa check-in hari ini"""
         user = self.get_user(user_id)
         if not user:
             return False
@@ -324,13 +324,13 @@ class MySQLDatabase:
         return last_date < today
 
     def checkin(self, user_id: int) -> bool:
-        """用户签到（修复无限签到bug）"""
+        """Check-in pengguna (perbaikan bug check-in tak terbatas)"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
         try:
-            # 使用SQL原子操作，避免竞态条件
-            # 只有当 last_checkin 是NULL 或者日期 < 今天时才更新
+            # Gunakan operasi SQL atomik untuk menghindari race condition
+            # Hanya update jika last_checkin NULL atau tanggal < hari ini
             cursor.execute(
                 """
                 UPDATE users
@@ -345,12 +345,12 @@ class MySQLDatabase:
             )
             conn.commit()
             
-            # 检查是否真的更新了（affected_rows > 0 表示签到成功）
+            # Cek apakah update berhasil (affected_rows > 0 artinya sukses)
             success = cursor.rowcount > 0
             return success
             
         except Exception as e:
-            logger.error(f"签到失败: {e}")
+            logger.error(f"Check-in gagal: {e}")
             conn.rollback()
             return False
         finally:
@@ -361,7 +361,7 @@ class MySQLDatabase:
         self, user_id: int, verification_type: str, verification_url: str,
         status: str, result: str = "", verification_id: str = ""
     ) -> bool:
-        """添加验证记录"""
+        """Tambahkan catatan verifikasi"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -377,7 +377,7 @@ class MySQLDatabase:
             conn.commit()
             return True
         except Exception as e:
-            logger.error(f"添加验证记录失败: {e}")
+            logger.error(f"Gagal menambahkan catatan verifikasi: {e}")
             conn.rollback()
             return False
         finally:
@@ -385,7 +385,7 @@ class MySQLDatabase:
             conn.close()
 
     def get_user_verifications(self, user_id: int) -> List[Dict]:
-        """获取用户的验证记录"""
+        """Ambil catatan verifikasi pengguna"""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
 
@@ -407,7 +407,7 @@ class MySQLDatabase:
         self, key_code: str, balance: int, created_by: int,
         max_uses: int = 1, expire_days: Optional[int] = None
     ) -> bool:
-        """创建卡密"""
+        """Buat kode"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -427,11 +427,11 @@ class MySQLDatabase:
             return True
 
         except pymysql.err.IntegrityError:
-            logger.error(f"卡密已存在: {key_code}")
+            logger.error(f"Kode sudah ada: {key_code}")
             conn.rollback()
             return False
         except Exception as e:
-            logger.error(f"创建卡密失败: {e}")
+            logger.error(f"Gagal membuat kode: {e}")
             conn.rollback()
             return False
         finally:
@@ -439,12 +439,12 @@ class MySQLDatabase:
             conn.close()
 
     def use_card_key(self, key_code: str, user_id: int) -> Optional[int]:
-        """使用卡密，返回获得的积分数量"""
+        """Gunakan kode, kembalikan jumlah poin yang didapat"""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
 
         try:
-            # 查询卡密
+            # Ambil kode
             cursor.execute(
                 "SELECT * FROM card_keys WHERE key_code = %s",
                 (key_code,),
@@ -454,15 +454,15 @@ class MySQLDatabase:
             if not card:
                 return None
 
-            # 检查是否过期
+            # Cek kedaluwarsa
             if card["expire_at"] and datetime.now() > card["expire_at"]:
                 return -2
 
-            # 检查使用次数
+            # Cek batas penggunaan
             if card["current_uses"] >= card["max_uses"]:
                 return -1
 
-            # 检查用户是否已使用过此卡密
+            # Cek apakah user sudah menggunakan kode ini
             cursor.execute(
                 "SELECT COUNT(*) as count FROM card_key_usage WHERE key_code = %s AND user_id = %s",
                 (key_code, user_id),
@@ -471,19 +471,19 @@ class MySQLDatabase:
             if count['count'] > 0:
                 return -3
 
-            # 更新使用次数
+            # Update jumlah penggunaan
             cursor.execute(
                 "UPDATE card_keys SET current_uses = current_uses + 1 WHERE key_code = %s",
                 (key_code,),
             )
 
-            # 记录使用记录
+            # Catat penggunaan
             cursor.execute(
                 "INSERT INTO card_key_usage (key_code, user_id, used_at) VALUES (%s, %s, NOW())",
                 (key_code, user_id),
             )
 
-            # 增加用户积分
+            # Tambahkan poin pengguna
             cursor.execute(
                 "UPDATE users SET balance = balance + %s WHERE user_id = %s",
                 (card["balance"], user_id),
@@ -493,7 +493,7 @@ class MySQLDatabase:
             return card["balance"]
 
         except Exception as e:
-            logger.error(f"使用卡密失败: {e}")
+            logger.error(f"Gagal menggunakan kode: {e}")
             conn.rollback()
             return None
         finally:
@@ -501,7 +501,7 @@ class MySQLDatabase:
             conn.close()
 
     def get_card_key_info(self, key_code: str) -> Optional[Dict]:
-        """获取卡密信息"""
+        """Ambil info kode"""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
 
@@ -513,7 +513,7 @@ class MySQLDatabase:
             conn.close()
 
     def get_all_card_keys(self, created_by: Optional[int] = None) -> List[Dict]:
-        """获取所有卡密（可按创建者筛选）"""
+        """Ambil semua kode (bisa difilter berdasarkan pembuat)"""
         conn = self.get_connection()
         cursor = conn.cursor(DictCursor)
 
@@ -532,7 +532,7 @@ class MySQLDatabase:
             conn.close()
 
     def get_all_user_ids(self) -> List[int]:
-        """获取所有用户ID"""
+        """Ambil semua user ID"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
@@ -545,6 +545,5 @@ class MySQLDatabase:
             conn.close()
 
 
-# 创建全局实例的别名，保持与SQLite版本的兼容性
+# Alias instance global, agar kompatibel dengan versi SQLite
 Database = MySQLDatabase
-
