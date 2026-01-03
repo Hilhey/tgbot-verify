@@ -1,6 +1,7 @@
 """Program utama verifikasi militer SheerID"""
 import logging
 import re
+from urllib.parse import urlparse
 from typing import Dict, Optional, Tuple
 
 import httpx
@@ -20,8 +21,9 @@ logger = logging.getLogger(__name__)
 class SheerIDVerifier:
     """Verifier identitas militer SheerID"""
 
-    def __init__(self, verification_id: str):
+    def __init__(self, verification_id: str, program_id: Optional[str] = None):
         self.verification_id = verification_id
+        self.program_id = program_id
         self.http_client = httpx.Client(timeout=30.0)
 
     def __del__(self):
@@ -31,6 +33,13 @@ class SheerIDVerifier:
     @staticmethod
     def parse_verification_id(url: str) -> Optional[str]:
         match = re.search(r"verificationId=([a-f0-9]+)", url, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        return None
+
+    @staticmethod
+    def parse_program_id(url: str) -> Optional[str]:
+        match = re.search(r"/verify/([^/]+)/", url)
         if match:
             return match.group(1)
         return None
@@ -136,12 +145,26 @@ class SheerIDVerifier:
             current_step = step2_data.get("currentStep")
             logger.info("✅ Pengiriman data pribadi selesai: %s", current_step)
 
+            redirect_url = step2_data.get("redirectUrl")
+            if redirect_url and self.program_id:
+                if redirect_url.startswith("http:/?") or redirect_url.startswith("/?"):
+                    query = redirect_url.split("?", 1)[-1]
+                    redirect_url = (
+                        f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{query}"
+                    )
+                else:
+                    parsed = urlparse(redirect_url)
+                    if parsed.scheme == "http" and parsed.netloc == "" and parsed.query:
+                        redirect_url = (
+                            f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{parsed.query}"
+                        )
+
             return {
                 "success": True,
                 "pending": current_step not in {"success", "complete"},
                 "message": "Informasi militer sudah dikirim",
                 "verification_id": self.verification_id,
-                "redirect_url": step2_data.get("redirectUrl"),
+                "redirect_url": redirect_url,
                 "status": step2_data,
             }
 

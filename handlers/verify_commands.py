@@ -581,6 +581,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
     if not verification_id:
         await update.message.reply_text("Tautan SheerID tidak valid, silakan periksa dan coba lagi.")
         return
+    program_id = MilitaryVerifier.parse_program_id(url)
 
     if not db.deduct_balance(user_id, VERIFY_COST):
         await update.message.reply_text("Gagal memotong poin, silakan coba lagi nanti.")
@@ -597,7 +598,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     try:
         async with semaphore:
-            verifier = MilitaryVerifier(verification_id)
+            verifier = MilitaryVerifier(verification_id, program_id=program_id)
             result = await asyncio.to_thread(verifier.verify, email=email)
 
         db.add_verification(
