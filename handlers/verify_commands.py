@@ -18,6 +18,7 @@ from youtube.sheerid_verifier import SheerIDVerifier as YouTubeVerifier
 from Boltnew.sheerid_verifier import SheerIDVerifier as BoltnewVerifier
 from military.sheerid_verifier import SheerIDVerifier as MilitaryVerifier
 from utils.messages import get_insufficient_balance_message, get_verify_usage_message
+from utils.http_client import create_async_client
 
 # Coba impor kontrol konkruensi, jika gagal gunakan implementasi sederhana
 try:
@@ -440,7 +441,7 @@ async def _auto_get_reward_code(
     start_time = time.time()
     attempts = 0
     
-    async with httpx.AsyncClient(timeout=30.0, proxies=proxy) as client:
+    async with create_async_client(timeout=30.0, proxy=proxy) as client:
         while True:
             elapsed = int(time.time() - start_time)
             attempts += 1

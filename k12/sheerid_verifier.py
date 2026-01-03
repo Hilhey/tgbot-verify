@@ -10,10 +10,12 @@ try:
     from . import config  # type: ignore
     from .name_generator import NameGenerator, generate_email, generate_birth_date  # type: ignore
     from .img_generator import generate_teacher_pdf, generate_teacher_png  # type: ignore
+    from utils.http_client import create_client
 except ImportError:
     import config  # type: ignore
     from name_generator import NameGenerator, generate_email, generate_birth_date  # type: ignore
     from img_generator import generate_teacher_pdf, generate_teacher_png  # type: ignore
+    from utils.http_client import create_client
 
 # Impor konstanta konfigurasi
 PROGRAM_ID = config.PROGRAM_ID
@@ -44,7 +46,7 @@ class SheerIDVerifier:
         """
         self.verification_id = verification_id
         self.device_fingerprint = self._generate_device_fingerprint()
-        self.http_client = httpx.Client(timeout=30.0, proxies=proxy)
+        self.http_client = create_client(timeout=30.0, proxy=proxy)
 
     def __del__(self):
         """Bersihkan HTTP client"""

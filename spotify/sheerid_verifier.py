@@ -8,6 +8,7 @@ from typing import Dict, Optional, Tuple
 from . import config
 from .name_generator import NameGenerator, generate_email, generate_birth_date
 from .img_generator import generate_psu_email, generate_image
+from utils.http_client import create_client
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -24,7 +25,7 @@ class SheerIDVerifier:
     def __init__(self, verification_id: str, proxy: Optional[str] = None):
         self.verification_id = verification_id
         self.device_fingerprint = self._generate_device_fingerprint()
-        self.http_client = httpx.Client(timeout=30.0, proxies=proxy)
+        self.http_client = create_client(timeout=30.0, proxy=proxy)
 
     def __del__(self):
         if hasattr(self, "http_client"):

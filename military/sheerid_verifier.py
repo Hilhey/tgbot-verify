@@ -8,6 +8,7 @@ import httpx
 
 from . import config
 from .data_store import get_organization, pop_random_record
+from utils.http_client import create_client
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -29,7 +30,7 @@ class SheerIDVerifier:
     ):
         self.verification_id = verification_id
         self.program_id = program_id
-        self.http_client = httpx.Client(timeout=30.0, proxies=proxy)
+        self.http_client = create_client(timeout=30.0, proxy=proxy)
 
     def __del__(self):
         if hasattr(self, "http_client"):
