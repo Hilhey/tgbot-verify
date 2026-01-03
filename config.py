@@ -11,7 +11,18 @@ CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "pk_oa")
 CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/pk_oa")
 
 # Konfigurasi admin
-ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "123456789"))
+def _get_int_env(name: str, default: int) -> int:
+    """Ambil nilai integer dari env dengan fallback default."""
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+ADMIN_USER_ID = _get_int_env("ADMIN_USER_ID", 123456789)
 
 # Konfigurasi poin
 VERIFY_COST = 1  # biaya poin untuk verifikasi
