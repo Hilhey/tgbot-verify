@@ -2,7 +2,7 @@
 import logging
 from functools import partial
 
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from config import BOT_TOKEN
 from database_mysql import Database
@@ -22,6 +22,7 @@ from handlers.verify_commands import (
     verify4_command,
     verify5_command,
     verify6_command,
+    verify6_text_handler,
     getV4Code_command,
 )
 from handlers.admin_commands import (
@@ -77,6 +78,9 @@ def main():
     application.add_handler(CommandHandler("verify5", partial(verify5_command, db=db)))
     application.add_handler(CommandHandler("verify6", partial(verify6_command, db=db)))
     application.add_handler(CommandHandler("getV4Code", partial(getV4Code_command, db=db)))
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, partial(verify6_text_handler, db=db))
+    )
 
     # Daftarkan perintah admin
     application.add_handler(CommandHandler("addbalance", partial(addbalance_command, db=db)))

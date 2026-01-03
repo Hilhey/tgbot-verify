@@ -68,7 +68,7 @@ def get_help_message(is_admin: bool = False) -> str:
         f"/verify3 <tautan> [proxy] - Spotify Student (biaya {VERIFY_COST} poin)\n"
         f"/verify4 <tautan> [proxy] - Bolt.new Teacher (biaya {VERIFY_COST} poin)\n"
         f"/verify5 <tautan> [proxy] - YouTube Student Premium (biaya {VERIFY_COST} poin)\n"
-        f"/verify6 <tautan> <email> [proxy] - ChatGPT Military (biaya {VERIFY_COST} poin)\n"
+        f"/verify6 <tautan> - ChatGPT Military (biaya {VERIFY_COST} poin)\n"
         "/getV4Code <verification_id> - Ambil kode verifikasi Bolt.new\n"
         "/help - Lihat bantuan ini\n"
         f"Gagal verifikasi lihat: {HELP_NOTION_URL}\n"

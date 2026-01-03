@@ -7,6 +7,7 @@ from typing import Optional
 
 from telegram import Update
 from telegram.ext import ContextTypes
+from utils.checks import reject_group_command
 
 from config import VERIFY_COST
 from database_mysql import Database
@@ -29,6 +30,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _normalize_proxy(raw_proxy: Optional[str]) -> Optional[str]:
+    if not raw_proxy:
+        return None
+    proxy = raw_proxy.strip()
+    if proxy.lower() in {"skip", "none", "-"}:
+        return None
+    if "://" not in proxy:
+        proxy = f"http://{proxy}"
+    return proxy
+
+
 async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
     """Menangani perintah /verify - Gemini One Pro"""
     user_id = update.effective_user.id
@@ -48,6 +60,7 @@ async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db:
         return
 
     url = context.args[0]
+    proxy = _normalize_proxy(context.args[1]) if len(context.args) > 1 else None
     proxy = context.args[1] if len(context.args) > 1 else None
     proxy = context.args[1] if len(context.args) > 1 else None
     proxy = context.args[1] if len(context.args) > 1 else None
@@ -129,6 +142,7 @@ async def verify2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         return
 
     url = context.args[0]
+    proxy = _normalize_proxy(context.args[1]) if len(context.args) > 1 else None
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -205,6 +219,7 @@ async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         return
 
     url = context.args[0]
+    proxy = _normalize_proxy(context.args[1]) if len(context.args) > 1 else None
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -288,6 +303,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         return
 
     url = context.args[0]
+    proxy = _normalize_proxy(context.args[1]) if len(context.args) > 1 else None
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -485,6 +501,7 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         return
 
     url = context.args[0]
+    proxy = _normalize_proxy(context.args[1]) if len(context.args) > 1 else None
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -551,6 +568,9 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
 async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
     """Menangani perintah /verify6 - ChatGPT Military"""
+    if await reject_group_command(update):
+        return
+
     user_id = update.effective_user.id
 
     if db.is_user_blocked(user_id):
@@ -561,11 +581,11 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         await update.message.reply_text("Silakan gunakan /start terlebih dahulu untuk mendaftar.")
         return
 
-    if len(context.args) < 2:
+    if not context.args:
         await update.message.reply_text(
-            "Cara penggunaan: /verify6 <tautan SheerID> <email> [proxy]\n\n"
+            "Cara penggunaan: /verify6 <tautan SheerID>\n\n"
             "Contoh:\n"
-            "/verify6 https://services.sheerid.com/verify/xxx/?verificationId=xxx user@example.com http://user:pass@host:port\n\n"
+            "/verify6 https://services.sheerid.com/verify/xxx/?verificationId=xxx\n\n"
             "Cara mendapatkan tautan verifikasi:\n"
             "1. Kunjungi halaman verifikasi ChatGPT Military\n"
             "2. Mulai proses verifikasi\n"
@@ -575,8 +595,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         return
 
     url = context.args[0]
-    email = context.args[1]
-    proxy = context.args[2] if len(context.args) > 2 else None
+    context.user_data["verify6"] = {"url": url, "stage": "await_email"}
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -596,8 +615,56 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         )
         return
 
+    context.user_data["verify6"].update(
+        {"verification_id": verification_id, "program_id": program_id}
+    )
+    await update.message.reply_text("Silakan input email untuk verifikasi.")
+
+
+async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
+    if await reject_group_command(update):
+        return
+
+    if not update.message or not update.message.text:
+        return
+
+    data = context.user_data.get("verify6")
+    if not data:
+        return
+
+    stage = data.get("stage")
+    text = update.message.text.strip()
+
+    if stage == "await_email":
+        data["email"] = text
+        data["stage"] = "await_proxy"
+        await update.message.reply_text(
+            "Silakan input proxy (format host:port atau http://user:pass@host:port).\n"
+            "Kirim `skip` jika tidak menggunakan proxy."
+        )
+        return
+
+    if stage != "await_proxy":
+        return
+
+    proxy = _normalize_proxy(text)
+    url = data["url"]
+    email = data["email"]
+    verification_id = data["verification_id"]
+    program_id = data["program_id"]
+
+    user_id = update.effective_user.id
+    user = db.get_user(user_id)
+    if not user or user["balance"] < VERIFY_COST:
+        await update.message.reply_text(
+            get_insufficient_balance_message(user["balance"] if user else 0)
+        )
+        context.user_data.pop("verify6", None)
+        return
+
     if not db.deduct_balance(user_id, VERIFY_COST):
         await update.message.reply_text("Gagal memotong poin, silakan coba lagi nanti.")
+        context.user_data.pop("verify6", None)
         return
 
     processing_msg = await update.message.reply_text(
@@ -611,7 +678,9 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     try:
         async with semaphore:
-            verifier = MilitaryVerifier(verification_id, program_id=program_id, proxy=proxy)
+            verifier = MilitaryVerifier(
+                verification_id, program_id=program_id, proxy=proxy
+            )
             result = await asyncio.to_thread(verifier.verify, email=email)
 
         db.add_verification(
@@ -643,6 +712,8 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
             f"❌ Terjadi kesalahan saat proses: {str(e)}\n\n"
             f"{VERIFY_COST} poin telah dikembalikan"
         )
+    finally:
+        context.user_data.pop("verify6", None)
 
 
 async def getV4Code_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
