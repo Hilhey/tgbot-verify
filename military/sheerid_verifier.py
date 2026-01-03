@@ -21,10 +21,15 @@ logger = logging.getLogger(__name__)
 class SheerIDVerifier:
     """Verifier identitas militer SheerID"""
 
-    def __init__(self, verification_id: str, program_id: Optional[str] = None):
+    def __init__(
+        self,
+        verification_id: str,
+        program_id: Optional[str] = None,
+        proxy: Optional[str] = None,
+    ):
         self.verification_id = verification_id
         self.program_id = program_id
-        self.http_client = httpx.Client(timeout=30.0)
+        self.http_client = httpx.Client(timeout=30.0, proxies=proxy)
 
     def __del__(self):
         if hasattr(self, "http_client"):

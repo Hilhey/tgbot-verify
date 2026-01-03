@@ -48,6 +48,11 @@ async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db:
         return
 
     url = context.args[0]
+    proxy = context.args[1] if len(context.args) > 1 else None
+    proxy = context.args[1] if len(context.args) > 1 else None
+    proxy = context.args[1] if len(context.args) > 1 else None
+    proxy = context.args[1] if len(context.args) > 1 else None
+    proxy = context.args[1] if len(context.args) > 1 else None
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -72,7 +77,7 @@ async def verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db:
     )
 
     try:
-        verifier = OneVerifier(verification_id)
+        verifier = OneVerifier(verification_id, proxy=proxy)
         result = await asyncio.to_thread(verifier.verify)
 
         db.add_verification(
@@ -148,7 +153,7 @@ async def verify2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
     )
 
     try:
-        verifier = K12Verifier(verification_id)
+        verifier = K12Verifier(verification_id, proxy=proxy)
         result = await asyncio.to_thread(verifier.verify)
 
         db.add_verification(
@@ -230,7 +235,7 @@ async def verify3_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     try:
         async with semaphore:
-            verifier = SpotifyVerifier(verification_id)
+            verifier = SpotifyVerifier(verification_id, proxy=proxy)
             result = await asyncio.to_thread(verifier.verify)
 
         db.add_verification(
@@ -314,7 +319,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
     try:
         async with semaphore:
             # Langkah 1: kirim dokumen
-            verifier = BoltnewVerifier(url, verification_id=verification_id)
+            verifier = BoltnewVerifier(url, verification_id=verification_id, proxy=proxy)
             result = await asyncio.to_thread(verifier.verify)
 
         if not result.get("success"):
@@ -344,7 +349,7 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         )
         
         # Langkah 2: ambil kode verifikasi otomatis (maks 20 detik)
-        code = await _auto_get_reward_code(vid, max_wait=20, interval=5)
+        code = await _auto_get_reward_code(vid, max_wait=20, interval=5, proxy=proxy)
         
         if code:
             # Berhasil mendapatkan kode
@@ -402,7 +407,8 @@ async def verify4_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 async def _auto_get_reward_code(
     verification_id: str,
     max_wait: int = 20,
-    interval: int = 5
+    interval: int = 5,
+    proxy: Optional[str] = None,
 ) -> Optional[str]:
     """Ambil kode verifikasi otomatis (polling ringan, tidak mengganggu konkruensi)
     
@@ -418,7 +424,7 @@ async def _auto_get_reward_code(
     start_time = time.time()
     attempts = 0
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, proxies=proxy) as client:
         while True:
             elapsed = int(time.time() - start_time)
             attempts += 1
@@ -509,7 +515,7 @@ async def verify5_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     try:
         async with semaphore:
-            verifier = YouTubeVerifier(verification_id)
+            verifier = YouTubeVerifier(verification_id, proxy=proxy)
             result = await asyncio.to_thread(verifier.verify)
 
         db.add_verification(
@@ -557,9 +563,9 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     if len(context.args) < 2:
         await update.message.reply_text(
-            "Cara penggunaan: /verify6 <tautan SheerID> <email>\n\n"
+            "Cara penggunaan: /verify6 <tautan SheerID> <email> [proxy]\n\n"
             "Contoh:\n"
-            "/verify6 https://services.sheerid.com/verify/xxx/?verificationId=xxx user@example.com\n\n"
+            "/verify6 https://services.sheerid.com/verify/xxx/?verificationId=xxx user@example.com http://user:pass@host:port\n\n"
             "Cara mendapatkan tautan verifikasi:\n"
             "1. Kunjungi halaman verifikasi ChatGPT Military\n"
             "2. Mulai proses verifikasi\n"
@@ -570,6 +576,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     url = context.args[0]
     email = context.args[1]
+    proxy = context.args[2] if len(context.args) > 2 else None
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -604,7 +611,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
 
     try:
         async with semaphore:
-            verifier = MilitaryVerifier(verification_id, program_id=program_id)
+            verifier = MilitaryVerifier(verification_id, program_id=program_id, proxy=proxy)
             result = await asyncio.to_thread(verifier.verify, email=email)
 
         db.add_verification(

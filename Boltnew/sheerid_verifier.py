@@ -21,12 +21,17 @@ logger = logging.getLogger(__name__)
 class SheerIDVerifier:
     """Verifier identitas guru SheerID"""
 
-    def __init__(self, install_page_url: str, verification_id: Optional[str] = None):
+    def __init__(
+        self,
+        install_page_url: str,
+        verification_id: Optional[str] = None,
+        proxy: Optional[str] = None,
+    ):
         self.install_page_url = self.normalize_url(install_page_url)
         self.verification_id = verification_id
         self.external_user_id = self.parse_external_user_id(self.install_page_url)
         self.device_fingerprint = self._generate_device_fingerprint()
-        self.http_client = httpx.Client(timeout=30.0)
+        self.http_client = httpx.Client(timeout=30.0, proxies=proxy)
 
     def __del__(self):
         if hasattr(self, "http_client"):
