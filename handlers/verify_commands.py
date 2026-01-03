@@ -596,7 +596,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         return
 
     url = context.args[0]
-    context.user_data["verify6"] = {"url": url, "stage": "await_email"}
+    context.user_data["verify6"] = {"url": url, "stage": "await_email_choice"}
     user = db.get_user(user_id)
     if user["balance"] < VERIFY_COST:
         await update.message.reply_text(
@@ -619,7 +619,11 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
     context.user_data["verify6"].update(
         {"verification_id": verification_id, "program_id": program_id}
     )
-    await update.message.reply_text("Silakan input email untuk verifikasi.")
+    await update.message.reply_text(
+        "Pilih metode email untuk verifikasi:\n"
+        "1) TempMail otomatis (bot akan handle email)\n"
+        "2) Input email manual"
+    )
 
 
 async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, db: Database):
@@ -636,7 +640,33 @@ async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     stage = data.get("stage")
     text = update.message.text.strip()
 
+    if stage == "await_email_choice":
+        if text in {"1", "tempmail", "auto", "otomatis"}:
+            data["email_mode"] = "tempmail"
+            data["stage"] = "await_proxy_choice"
+            await update.message.reply_text(
+                "✅ Mode TempMail otomatis dipilih. Bot akan handle email verifikasi.\n\n"
+                "Pilih penggunaan proxy:\n"
+                "1) Tanpa proxy\n"
+                "2) Pakai proxy manual"
+            )
+            return
+        if text in {"2", "manual", "email manual"}:
+            data["email_mode"] = "manual"
+            data["stage"] = "await_email"
+            await update.message.reply_text("Silakan input email untuk verifikasi.")
+            return
+        await update.message.reply_text(
+            "Pilihan tidak valid. Balas dengan 1 (TempMail otomatis) atau 2 (email manual)."
+        )
+        return
+
     if stage == "await_email":
+        if "@" not in text:
+            await update.message.reply_text(
+                "Format email tidak valid. Silakan input email yang benar."
+            )
+            return
         data["email"] = text
         data["stage"] = "await_proxy_choice"
         await update.message.reply_text(
@@ -669,7 +699,8 @@ async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if stage == "await_proxy":
         proxy = _normalize_proxy(text)
     url = data["url"]
-    email = data["email"]
+    use_tempmail = data.get("email_mode") == "tempmail"
+    email = data.get("email")
     verification_id = data["verification_id"]
     program_id = data["program_id"]
 
@@ -701,7 +732,9 @@ async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             verifier = MilitaryVerifier(
                 verification_id, program_id=program_id, proxy=proxy
             )
-            result = await asyncio.to_thread(verifier.verify, email=email)
+            result = await asyncio.to_thread(
+                verifier.verify, email=email, use_tempmail=use_tempmail
+            )
 
         db.add_verification(
             user_id,
@@ -716,6 +749,13 @@ async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             if result.get("pending"):
                 result_msg += "✨ Informasi sudah dikirim, menunggu peninjauan SheerID\n"
                 result_msg += "⏱️ Estimasi waktu peninjauan: beberapa menit\n\n"
+            if result.get("email"):
+                result_msg += f"📧 Email: {result['email']}\n"
+                if use_tempmail:
+                    result_msg += (
+                        "📨 TempMail otomatis dipakai"
+                        f"{' (email diverifikasi otomatis)' if result.get('email_verified') else ''}\n\n"
+                    )
             if result.get("redirect_url"):
                 result_msg += f"🔗 Tautan lanjut:\n{result['redirect_url']}"
             await processing_msg.edit_text(result_msg)

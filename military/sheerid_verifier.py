@@ -1,8 +1,9 @@
 """Program utama verifikasi militer SheerID"""
 import logging
 import re
+import time
 from urllib.parse import urlparse
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import httpx
 
@@ -91,12 +92,85 @@ class SheerIDVerifier:
             raise Exception(f"collectInactiveMilitaryPersonalInfo error: {error_msg}")
         return step2_data
 
+    def _create_tempmail(self) -> Tuple[str, str, str]:
+        response = self.http_client.get(
+            config.TEMPMAIL_API_BASE,
+            params={"action": "genRandomMailbox", "count": 1},
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not data:
+            raise Exception("Gagal membuat tempmail")
+        email = data[0]
+        login, domain = email.split("@", 1)
+        return login, domain, email
+
+    def _fetch_tempmail_messages(self, login: str, domain: str) -> List[Dict]:
+        response = self.http_client.get(
+            config.TEMPMAIL_API_BASE,
+            params={"action": "getMessages", "login": login, "domain": domain},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _fetch_tempmail_message(self, login: str, domain: str, msg_id: int) -> Dict:
+        response = self.http_client.get(
+            config.TEMPMAIL_API_BASE,
+            params={
+                "action": "readMessage",
+                "login": login,
+                "domain": domain,
+                "id": msg_id,
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _extract_verification_link(text: str) -> Optional[str]:
+        if not text:
+            return None
+        for match in re.findall(r"https?://[^\\s\"'<>]+", text):
+            if "sheerid" in match and "verification" in match:
+                return match.rstrip(").,")
+        return None
+
+    def _await_verification_link(self, login: str, domain: str) -> Optional[str]:
+        deadline = time.time() + config.TEMPMAIL_POLL_TIMEOUT
+        seen_ids = set()
+        while time.time() < deadline:
+            try:
+                messages = self._fetch_tempmail_messages(login, domain)
+            except Exception as exc:
+                logger.warning("Gagal cek inbox tempmail: %s", exc)
+                time.sleep(config.TEMPMAIL_POLL_INTERVAL)
+                continue
+
+            for message in messages:
+                msg_id = message.get("id")
+                if msg_id in seen_ids:
+                    continue
+                seen_ids.add(msg_id)
+                try:
+                    full_msg = self._fetch_tempmail_message(login, domain, msg_id)
+                except Exception as exc:
+                    logger.warning("Gagal baca email tempmail: %s", exc)
+                    continue
+                body = full_msg.get("htmlBody") or full_msg.get("textBody") or ""
+                link = self._extract_verification_link(body)
+                if link:
+                    return link
+
+            time.sleep(config.TEMPMAIL_POLL_INTERVAL)
+        return None
+
     def verify(
         self,
         first_name: str = None,
         last_name: str = None,
         email: str = None,
         birth_date: str = None,
+        use_tempmail: bool = False,
     ) -> Dict:
         """Jalankan alur verifikasi militer"""
         try:
@@ -105,7 +179,11 @@ class SheerIDVerifier:
             last_name = record.last_name
             birth_date = record.birth_date
 
-            if not email:
+            tempmail_login = None
+            tempmail_domain = None
+            if use_tempmail:
+                tempmail_login, tempmail_domain, email = self._create_tempmail()
+            elif not email:
                 raise ValueError("Email wajib diisi oleh pengguna")
 
             discharge_date = record.discharge_date
@@ -165,12 +243,29 @@ class SheerIDVerifier:
                             f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{parsed.query}"
                         )
 
+            verification_link = None
+            email_verified = False
+            if use_tempmail and tempmail_login and tempmail_domain:
+                logger.info("Menunggu email verifikasi di tempmail...")
+                verification_link = self._await_verification_link(
+                    tempmail_login, tempmail_domain
+                )
+                if verification_link:
+                    logger.info("Menemukan link verifikasi email, membuka tautan...")
+                    self.http_client.get(verification_link)
+                    email_verified = True
+                else:
+                    logger.warning("Link verifikasi tidak ditemukan dalam waktu tunggu.")
+
             return {
                 "success": True,
                 "pending": current_step not in {"success", "complete"},
                 "message": "Informasi militer sudah dikirim",
                 "verification_id": self.verification_id,
                 "redirect_url": redirect_url,
+                "email": email,
+                "email_verified": email_verified,
+                "verification_link": verification_link,
                 "status": step2_data,
             }
 

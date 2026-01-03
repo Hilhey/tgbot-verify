@@ -66,3 +66,7 @@ SUBMISSION_OPT_IN = (
     "with SheerID as a processor/third-party service provider in order for SheerID to confirm my "
     "eligibility for a special offer. Contact OpenAI Support for further assistance at support@openai.com"
 )
+
+TEMPMAIL_API_BASE = "https://www.1secmail.com/api/v1/"
+TEMPMAIL_POLL_INTERVAL = 5
+TEMPMAIL_POLL_TIMEOUT = 120
