@@ -582,6 +582,12 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
         await update.message.reply_text("Tautan SheerID tidak valid, silakan periksa dan coba lagi.")
         return
     program_id = MilitaryVerifier.parse_program_id(url)
+    if not program_id:
+        await update.message.reply_text(
+            "Program ID tidak ditemukan di tautan. Pastikan link berformat:\n"
+            "https://services.sheerid.com/verify/{programId}/?verificationId=..."
+        )
+        return
 
     if not db.deduct_balance(user_id, VERIFY_COST):
         await update.message.reply_text("Gagal memotong poin, silakan coba lagi nanti.")

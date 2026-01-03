@@ -147,14 +147,14 @@ class SheerIDVerifier:
 
             redirect_url = step2_data.get("redirectUrl")
             if redirect_url and self.program_id:
-                if redirect_url.startswith("http:/?") or redirect_url.startswith("/?"):
+                if redirect_url.startswith("?") or redirect_url.startswith("http:/?") or redirect_url.startswith("/?"):
                     query = redirect_url.split("?", 1)[-1]
                     redirect_url = (
                         f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{query}"
                     )
                 else:
                     parsed = urlparse(redirect_url)
-                    if parsed.scheme == "http" and parsed.netloc == "" and parsed.query:
+                    if not parsed.netloc and parsed.query:
                         redirect_url = (
                             f"{config.SHEERID_BASE_URL}/verify/{self.program_id}/?{parsed.query}"
                         )
