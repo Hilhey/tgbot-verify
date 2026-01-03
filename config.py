@@ -22,7 +22,7 @@ def _get_int_env(name: str, default: int) -> int:
         return default
 
 
-ADMIN_USER_ID = _get_int_env("ADMIN_USER_ID", 123456789)
+ADMIN_USER_ID = _get_int_env("ADMIN_USER_ID", 5463047605)
 
 # Konfigurasi poin
 VERIFY_COST = 1  # biaya poin untuk verifikasi
