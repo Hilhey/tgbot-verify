@@ -637,17 +637,36 @@ async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if stage == "await_email":
         data["email"] = text
-        data["stage"] = "await_proxy"
+        data["stage"] = "await_proxy_choice"
         await update.message.reply_text(
-            "Silakan input proxy (format host:port atau http://user:pass@host:port).\n"
-            "Kirim `skip` jika tidak menggunakan proxy."
+            "Pilih penggunaan proxy:\n"
+            "1) Tanpa proxy\n"
+            "2) Pakai proxy manual"
         )
         return
 
-    if stage != "await_proxy":
+    if stage == "await_proxy_choice":
+        if text in {"1", "tanpa", "tanpa proxy", "no", "n"}:
+            data["proxy"] = None
+            stage = "await_proxy_done"
+        elif text in {"2", "proxy", "pakai proxy", "manual"}:
+            data["stage"] = "await_proxy"
+            await update.message.reply_text(
+                "Silakan input proxy (format host:port atau http://user:pass@host:port)."
+            )
+            return
+        else:
+            await update.message.reply_text(
+                "Pilihan tidak valid. Balas dengan 1 (tanpa proxy) atau 2 (pakai proxy manual)."
+            )
+            return
+
+    if stage not in {"await_proxy", "await_proxy_done"}:
         return
 
-    proxy = _normalize_proxy(text)
+    proxy = data.get("proxy")
+    if stage == "await_proxy":
+        proxy = _normalize_proxy(text)
     url = data["url"]
     email = data["email"]
     verification_id = data["verification_id"]
