@@ -621,7 +621,7 @@ async def verify6_command(update: Update, context: ContextTypes.DEFAULT_TYPE, db
     )
     await update.message.reply_text(
         "Pilih metode email untuk verifikasi:\n"
-        "1) TempMail otomatis (bot akan handle email)\n"
+        "1) TempMail otomatis (mail.tm - bot handle email)\n"
         "2) Input email manual"
     )
 
@@ -645,7 +645,7 @@ async def verify6_text_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             data["email_mode"] = "tempmail"
             data["stage"] = "await_proxy_choice"
             await update.message.reply_text(
-                "✅ Mode TempMail otomatis dipilih. Bot akan handle email verifikasi.\n\n"
+                "✅ Mode TempMail otomatis dipilih (mail.tm). Bot akan handle email verifikasi.\n\n"
                 "Pilih penggunaan proxy:\n"
                 "1) Tanpa proxy\n"
                 "2) Pakai proxy manual"

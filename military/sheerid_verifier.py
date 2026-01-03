@@ -1,6 +1,7 @@
 """Program utama verifikasi militer SheerID"""
 import logging
 import re
+import secrets
 import time
 from urllib.parse import urlparse
 from typing import Dict, List, Optional, Tuple
@@ -92,36 +93,50 @@ class SheerIDVerifier:
             raise Exception(f"collectInactiveMilitaryPersonalInfo error: {error_msg}")
         return step2_data
 
-    def _create_tempmail(self) -> Tuple[str, str, str]:
+    def _create_tempmail(self) -> Tuple[str, str]:
+        domains_response = self.http_client.get(f"{config.TEMPMAIL_API_BASE}domains")
+        domains_response.raise_for_status()
+        domains = domains_response.json().get("hydra:member", [])
+        if not domains:
+            raise Exception("Domain tempmail tidak tersedia")
+        domain = domains[0]["domain"]
+
+        for _ in range(3):
+            local_part = secrets.token_hex(4)
+            email = f"{local_part}@{domain}"
+            password = secrets.token_urlsafe(12)
+            account_response = self.http_client.post(
+                f"{config.TEMPMAIL_API_BASE}accounts",
+                json={"address": email, "password": password},
+            )
+            if account_response.status_code == 201:
+                break
+        else:
+            raise Exception("Gagal membuat akun tempmail")
+
+        token_response = self.http_client.post(
+            f"{config.TEMPMAIL_API_BASE}token",
+            json={"address": email, "password": password},
+        )
+        token_response.raise_for_status()
+        token = token_response.json().get("token")
+        if not token:
+            raise Exception("Token tempmail tidak ditemukan")
+
+        return token, email
+
+    def _fetch_tempmail_messages(self, token: str) -> List[Dict]:
         response = self.http_client.get(
-            config.TEMPMAIL_API_BASE,
-            params={"action": "genRandomMailbox", "count": 1},
+            f"{config.TEMPMAIL_API_BASE}messages",
+            headers={"Authorization": f"Bearer {token}"},
         )
         response.raise_for_status()
-        data = response.json()
-        if not data:
-            raise Exception("Gagal membuat tempmail")
-        email = data[0]
-        login, domain = email.split("@", 1)
-        return login, domain, email
+        return response.json().get("hydra:member", [])
 
-    def _fetch_tempmail_messages(self, login: str, domain: str) -> List[Dict]:
+    def _fetch_tempmail_message(self, token: str, msg_id: str) -> Dict:
         response = self.http_client.get(
-            config.TEMPMAIL_API_BASE,
-            params={"action": "getMessages", "login": login, "domain": domain},
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def _fetch_tempmail_message(self, login: str, domain: str, msg_id: int) -> Dict:
-        response = self.http_client.get(
-            config.TEMPMAIL_API_BASE,
-            params={
-                "action": "readMessage",
-                "login": login,
-                "domain": domain,
-                "id": msg_id,
-            },
+            f"{config.TEMPMAIL_API_BASE}messages/{msg_id}",
+            headers={"Authorization": f"Bearer {token}"},
         )
         response.raise_for_status()
         return response.json()
@@ -135,12 +150,12 @@ class SheerIDVerifier:
                 return match.rstrip(").,")
         return None
 
-    def _await_verification_link(self, login: str, domain: str) -> Optional[str]:
+    def _await_verification_link(self, token: str) -> Optional[str]:
         deadline = time.time() + config.TEMPMAIL_POLL_TIMEOUT
         seen_ids = set()
         while time.time() < deadline:
             try:
-                messages = self._fetch_tempmail_messages(login, domain)
+                messages = self._fetch_tempmail_messages(token)
             except Exception as exc:
                 logger.warning("Gagal cek inbox tempmail: %s", exc)
                 time.sleep(config.TEMPMAIL_POLL_INTERVAL)
@@ -152,11 +167,18 @@ class SheerIDVerifier:
                     continue
                 seen_ids.add(msg_id)
                 try:
-                    full_msg = self._fetch_tempmail_message(login, domain, msg_id)
+                    full_msg = self._fetch_tempmail_message(token, msg_id)
                 except Exception as exc:
                     logger.warning("Gagal baca email tempmail: %s", exc)
                     continue
-                body = full_msg.get("htmlBody") or full_msg.get("textBody") or ""
+                body_parts = []
+                if isinstance(full_msg.get("text"), list):
+                    body_parts.extend(full_msg.get("text", []))
+                if isinstance(full_msg.get("html"), list):
+                    body_parts.extend(full_msg.get("html", []))
+                if full_msg.get("intro"):
+                    body_parts.append(full_msg.get("intro"))
+                body = "\n".join(body_parts)
                 link = self._extract_verification_link(body)
                 if link:
                     return link
@@ -179,10 +201,9 @@ class SheerIDVerifier:
             last_name = record.last_name
             birth_date = record.birth_date
 
-            tempmail_login = None
-            tempmail_domain = None
+            tempmail_token = None
             if use_tempmail:
-                tempmail_login, tempmail_domain, email = self._create_tempmail()
+                tempmail_token, email = self._create_tempmail()
             elif not email:
                 raise ValueError("Email wajib diisi oleh pengguna")
 
@@ -245,11 +266,9 @@ class SheerIDVerifier:
 
             verification_link = None
             email_verified = False
-            if use_tempmail and tempmail_login and tempmail_domain:
+            if use_tempmail and tempmail_token:
                 logger.info("Menunggu email verifikasi di tempmail...")
-                verification_link = self._await_verification_link(
-                    tempmail_login, tempmail_domain
-                )
+                verification_link = self._await_verification_link(tempmail_token)
                 if verification_link:
                     logger.info("Menemukan link verifikasi email, membuka tautan...")
                     self.http_client.get(verification_link)
